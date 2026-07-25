@@ -1,0 +1,1119 @@
+import type { ReactNode } from "react";
+import { useRef, useState } from "react";
+import { ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { api, ApiRequestError } from "@/lib/api";
+import type { WebsitePageKey } from "@/lib/website";
+
+type Sections = Record<string, unknown>;
+
+function asObj(v: unknown): Record<string, unknown> {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+function asArr<T = Record<string, unknown>>(v: unknown): T[] {
+  return Array.isArray(v) ? (v as T[]) : [];
+}
+
+function str(v: unknown) {
+  return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium">{label}</Label>
+      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {children}
+    </div>
+  );
+}
+
+function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return (
+    <section className="space-y-4 rounded-xl border border-border bg-background/60 p-4 md:p-5">
+      <div>
+        <h3 className="font-display text-base font-semibold">{title}</h3>
+        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+function setPath(sections: Sections, path: string[], value: unknown): Sections {
+  const next = structuredClone(sections) as Sections;
+  let cur: Record<string, unknown> = next;
+  for (let i = 0; i < path.length - 1; i++) {
+    const key = path[i]!;
+    const existing = cur[key];
+    if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+      cur[key] = {};
+    }
+    cur = cur[key] as Record<string, unknown>;
+  }
+  cur[path[path.length - 1]!] = value;
+  return next;
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+  hint,
+  multiline,
+  className,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  hint?: string;
+  multiline?: boolean;
+  className?: string;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      {multiline ? (
+        <Textarea
+          className={className || "min-h-[88px]"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <Input value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </Field>
+  );
+}
+
+function HeroFields({
+  hero,
+  onChange,
+  variant = "standard",
+}: {
+  hero: Record<string, unknown>;
+  onChange: (hero: Record<string, unknown>) => void;
+  variant?: "standard" | "home";
+}) {
+  const set = (key: string, value: string) => onChange({ ...hero, [key]: value });
+
+  if (variant === "home") {
+    return (
+      <Section title="Top banner (Hero)" description="Main headline visitors see first on the home page.">
+        <TextInput label="Small label above title" value={str(hero.eyebrow)} onChange={(v) => set("eyebrow", v)} />
+        <TextInput label="Title (first part)" value={str(hero.titlePrefix)} onChange={(v) => set("titlePrefix", v)} hint='e.g. "Together We"' />
+        <TextInput label="Highlighted title words" value={str(hero.titleHighlight)} onChange={(v) => set("titleHighlight", v)} hint='e.g. "Build Hope"' />
+        <div className="sm:col-span-2">
+          <TextInput label="Subtitle" value={str(hero.subtitle)} onChange={(v) => set("subtitle", v)} multiline />
+        </div>
+        <TextInput label="Primary button text" value={str(hero.primaryCta)} onChange={(v) => set("primaryCta", v)} />
+        <TextInput label="Primary button link" value={str(hero.primaryCtaLink)} onChange={(v) => set("primaryCtaLink", v)} hint="e.g. /donate" />
+        <TextInput label="Secondary button text" value={str(hero.secondaryCta)} onChange={(v) => set("secondaryCta", v)} />
+        <TextInput label="Secondary button link" value={str(hero.secondaryCtaLink)} onChange={(v) => set("secondaryCtaLink", v)} hint="e.g. /volunteer" />
+      </Section>
+    );
+  }
+
+  return (
+    <Section title="Page header" description="Title area at the top of this page.">
+      <TextInput label="Small label" value={str(hero.eyebrow)} onChange={(v) => set("eyebrow", v)} />
+      <TextInput label="Title" value={str(hero.title)} onChange={(v) => set("title", v)} />
+      <TextInput
+        label="Highlighted words in title"
+        value={str(hero.titleHighlight)}
+        onChange={(v) => set("titleHighlight", v)}
+        hint="Must appear inside the title text"
+      />
+      <div className="sm:col-span-2">
+        <TextInput label="Description" value={str(hero.description)} onChange={(v) => set("description", v)} multiline />
+      </div>
+    </Section>
+  );
+}
+
+function ListToolbar({
+  title,
+  onAdd,
+  addLabel,
+}: {
+  title: string;
+  onAdd: () => void;
+  addLabel: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 sm:col-span-2">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+        <Plus className="h-4 w-4" />
+        {addLabel}
+      </Button>
+    </div>
+  );
+}
+
+function ItemCard({
+  index,
+  onRemove,
+  children,
+  label,
+}: {
+  index: number;
+  onRemove: () => void;
+  children: ReactNode;
+  label?: string;
+}) {
+  return (
+    <div className="sm:col-span-2 space-y-3 rounded-lg border border-border bg-card p-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {label || "Item"} {index + 1}
+        </span>
+        <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={onRemove}>
+          <Trash2 className="h-4 w-4" />
+          Remove
+        </Button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
+    </div>
+  );
+}
+
+function GalleryImageField({
+  imageUrl,
+  onUploaded,
+  onClear,
+}: {
+  imageUrl: string;
+  onUploaded: (url: string) => void;
+  onClear: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function onPick(file: File | null) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPG, PNG, or WebP)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await api<{ success: true; data: { url: string } }>("/website/upload-image", {
+        method: "POST",
+        body: form,
+      });
+      onUploaded(res.data.url);
+      toast.success("Image uploaded");
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Image upload failed");
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="sm:col-span-2 space-y-2">
+      <Label className="text-sm font-medium">Photo</Label>
+      {imageUrl ? (
+        <div className="overflow-hidden rounded-lg border border-border">
+          <img src={imageUrl} alt="" className="h-40 w-full object-cover" />
+        </div>
+      ) : (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 text-xs text-muted-foreground">
+          No image yet — upload one below
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          className="hidden"
+          onChange={(e) => void onPick(e.target.files?.[0] ?? null)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+        >
+          {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+          {imageUrl ? "Replace image" : "Upload image"}
+        </Button>
+        {imageUrl ? (
+          <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={onClear}>
+            <Trash2 className="h-4 w-4" />
+            Remove image
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function WebsiteSectionsForm({
+  page,
+  sections,
+  onChange,
+}: {
+  page: WebsitePageKey;
+  sections: Sections;
+  onChange: (next: Sections) => void;
+}) {
+  const patch = (path: string[], value: unknown) => onChange(setPath(sections, path, value));
+
+  if (page === "home") {
+    const hero = asObj(sections.hero);
+    const stats = asArr<{ label?: string; value?: string }>(sections.stats);
+    const about = asObj(sections.aboutTeaser);
+    const donate = asObj(sections.donateCta);
+    const partners = asObj(sections.partners);
+    const partnerItems = (() => {
+      const fromItems = asArr<{ name?: string; logoUrl?: string }>(partners.items);
+      if (fromItems.length) return fromItems;
+      // legacy: names: string[]
+      return asArr<string>(partners.names).map((n) => ({
+        name: typeof n === "string" ? n : "",
+        logoUrl: "",
+      }));
+    })();
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} variant="home" onChange={(h) => patch(["hero"], h)} />
+        <Section title="Impact numbers" description="Stats shown under the home banner.">
+          <ListToolbar
+            title="Stats"
+            addLabel="Add stat"
+            onAdd={() => patch(["stats"], [...stats, { label: "New label", value: "0" }])}
+          />
+          {stats.map((s, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Stat"
+              onRemove={() => patch(["stats"], stats.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Label"
+                value={str(s.label)}
+                onChange={(v) => {
+                  const next = [...stats];
+                  next[i] = { ...s, label: v };
+                  patch(["stats"], next);
+                }}
+              />
+              <TextInput
+                label="Value"
+                value={str(s.value)}
+                onChange={(v) => {
+                  const next = [...stats];
+                  next[i] = { ...s, value: v };
+                  patch(["stats"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+        <Section title="About teaser">
+          <TextInput label="Small label" value={str(about.eyebrow)} onChange={(v) => patch(["aboutTeaser", "eyebrow"], v)} />
+          <TextInput label="Title" value={str(about.title)} onChange={(v) => patch(["aboutTeaser", "title"], v)} />
+          <div className="sm:col-span-2">
+            <TextInput label="Body" value={str(about.body)} onChange={(v) => patch(["aboutTeaser", "body"], v)} multiline />
+          </div>
+          <TextInput label="Button text" value={str(about.cta)} onChange={(v) => patch(["aboutTeaser", "cta"], v)} />
+          <TextInput label="Button link" value={str(about.ctaLink)} onChange={(v) => patch(["aboutTeaser", "ctaLink"], v)} />
+        </Section>
+        <Section title="Donate call-to-action">
+          <TextInput label="Title" value={str(donate.title)} onChange={(v) => patch(["donateCta", "title"], v)} />
+          <TextInput label="Button text" value={str(donate.cta)} onChange={(v) => patch(["donateCta", "cta"], v)} />
+          <div className="sm:col-span-2">
+            <TextInput label="Body" value={str(donate.body)} onChange={(v) => patch(["donateCta", "body"], v)} multiline />
+          </div>
+          <TextInput label="Button link" value={str(donate.ctaLink)} onChange={(v) => patch(["donateCta", "ctaLink"], v)} />
+        </Section>
+        <Section
+          title="Trusted partners"
+          description="Partner name and optional logo for the scrolling strip on the home page."
+        >
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Section title"
+              value={str(partners.title)}
+              onChange={(v) => patch(["partners", "title"], v)}
+            />
+          </div>
+          <ListToolbar
+            title="Partners"
+            addLabel="Add partner"
+            onAdd={() =>
+              patch(["partners", "items"], [...partnerItems, { name: "New partner", logoUrl: "" }])
+            }
+          />
+          {partnerItems.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Partner"
+              onRemove={() =>
+                patch(
+                  ["partners", "items"],
+                  partnerItems.filter((_, j) => j !== i),
+                )
+              }
+            >
+              <GalleryImageField
+                imageUrl={str(item.logoUrl)}
+                onUploaded={(url) => {
+                  const next = [...partnerItems];
+                  next[i] = { ...item, logoUrl: url };
+                  patch(["partners", "items"], next);
+                }}
+                onClear={() => {
+                  const next = [...partnerItems];
+                  next[i] = { ...item, logoUrl: "" };
+                  patch(["partners", "items"], next);
+                }}
+              />
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Partner name"
+                  value={str(item.name)}
+                  onChange={(v) => {
+                    const next = [...partnerItems];
+                    next[i] = { ...item, name: v };
+                    patch(["partners", "items"], next);
+                  }}
+                  hint="Shown if no logo, or as alt text for the logo"
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "about") {
+    const hero = asObj(sections.hero);
+    const story = asObj(sections.story);
+    const paragraphs = asArr<string>(story.paragraphs).map((p) => (typeof p === "string" ? p : ""));
+    const values = asArr<{ title?: string; body?: string }>(sections.values);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Our story">
+          <TextInput label="Section title" value={str(story.title)} onChange={(v) => patch(["story", "title"], v)} />
+          <TextInput label="Button text" value={str(story.cta)} onChange={(v) => patch(["story", "cta"], v)} />
+          <TextInput label="Button link" value={str(story.ctaLink)} onChange={(v) => patch(["story", "ctaLink"], v)} />
+          <ListToolbar
+            title="Story paragraphs"
+            addLabel="Add paragraph"
+            onAdd={() => patch(["story", "paragraphs"], [...paragraphs, ""])}
+          />
+          {paragraphs.map((p, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Paragraph"
+              onRemove={() => patch(["story", "paragraphs"], paragraphs.filter((_, j) => j !== i))}
+            >
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Text"
+                  value={p}
+                  multiline
+                  onChange={(v) => {
+                    const next = [...paragraphs];
+                    next[i] = v;
+                    patch(["story", "paragraphs"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+        <Section title="Values / principles">
+          <ListToolbar
+            title="Values"
+            addLabel="Add value"
+            onAdd={() => patch(["values"], [...values, { title: "New value", body: "" }])}
+          />
+          {values.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Value"
+              onRemove={() => patch(["values"], values.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Title"
+                value={str(item.title)}
+                onChange={(v) => {
+                  const next = [...values];
+                  next[i] = { ...item, title: v };
+                  patch(["values"], next);
+                }}
+              />
+              <TextInput
+                label="Short text"
+                value={str(item.body)}
+                onChange={(v) => {
+                  const next = [...values];
+                  next[i] = { ...item, body: v };
+                  patch(["values"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "mission") {
+    const hero = asObj(sections.hero);
+    const mission = asObj(sections.mission);
+    const vision = asObj(sections.vision);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Mission card">
+          <TextInput label="Title" value={str(mission.title)} onChange={(v) => patch(["mission", "title"], v)} />
+          <div className="sm:col-span-2">
+            <TextInput label="Text" value={str(mission.body)} onChange={(v) => patch(["mission", "body"], v)} multiline />
+          </div>
+        </Section>
+        <Section title="Vision card">
+          <TextInput label="Title" value={str(vision.title)} onChange={(v) => patch(["vision", "title"], v)} />
+          <div className="sm:col-span-2">
+            <TextInput label="Text" value={str(vision.body)} onChange={(v) => patch(["vision", "body"], v)} multiline />
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "leadership") {
+    const hero = asObj(sections.hero);
+    const groups = asArr<{ title?: string; members?: { name?: string; role?: string; bio?: string }[] }>(
+      sections.groups,
+    );
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Leadership groups" description="e.g. Board, Chapter Presidents, Executive Team.">
+          <ListToolbar
+            title="Groups"
+            addLabel="Add group"
+            onAdd={() =>
+              patch(["groups"], [...groups, { title: "New group", members: [{ name: "", role: "", bio: "" }] }])
+            }
+          />
+          {groups.map((g, gi) => (
+            <ItemCard
+              key={gi}
+              index={gi}
+              label="Group"
+              onRemove={() => patch(["groups"], groups.filter((_, j) => j !== gi))}
+            >
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Group title"
+                  value={str(g.title)}
+                  onChange={(v) => {
+                    const next = [...groups];
+                    next[gi] = { ...g, title: v };
+                    patch(["groups"], next);
+                  }}
+                />
+              </div>
+              <ListToolbar
+                title="People in this group"
+                addLabel="Add person"
+                onAdd={() => {
+                  const next = [...groups];
+                  next[gi] = { ...g, members: [...(g.members || []), { name: "", role: "", bio: "" }] };
+                  patch(["groups"], next);
+                }}
+              />
+              {(g.members || []).map((m, mi) => (
+                <ItemCard
+                  key={mi}
+                  index={mi}
+                  label="Person"
+                  onRemove={() => {
+                    const next = [...groups];
+                    next[gi] = { ...g, members: (g.members || []).filter((_, j) => j !== mi) };
+                    patch(["groups"], next);
+                  }}
+                >
+                  <TextInput
+                    label="Name"
+                    value={str(m.name)}
+                    onChange={(v) => {
+                      const next = [...groups];
+                      const members = [...(g.members || [])];
+                      members[mi] = { ...m, name: v };
+                      next[gi] = { ...g, members };
+                      patch(["groups"], next);
+                    }}
+                  />
+                  <TextInput
+                    label="Role / title"
+                    value={str(m.role)}
+                    onChange={(v) => {
+                      const next = [...groups];
+                      const members = [...(g.members || [])];
+                      members[mi] = { ...m, role: v };
+                      next[gi] = { ...g, members };
+                      patch(["groups"], next);
+                    }}
+                  />
+                  <div className="sm:col-span-2">
+                    <TextInput
+                      label="Short bio (optional)"
+                      value={str(m.bio)}
+                      onChange={(v) => {
+                        const next = [...groups];
+                        const members = [...(g.members || [])];
+                        members[mi] = { ...m, bio: v };
+                        next[gi] = { ...g, members };
+                        patch(["groups"], next);
+                      }}
+                      multiline
+                    />
+                  </div>
+                </ItemCard>
+              ))}
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "chapters") {
+    const hero = asObj(sections.hero);
+    const items = asArr<{
+      city?: string;
+      president?: string;
+      members?: number | string;
+      projects?: number | string;
+      donations?: string;
+    }>(sections.items);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Chapter list">
+          <ListToolbar
+            title="Chapters"
+            addLabel="Add chapter"
+            onAdd={() =>
+              patch(["items"], [...items, { city: "", president: "", members: 0, projects: 0, donations: "" }])
+            }
+          />
+          {items.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Chapter"
+              onRemove={() => patch(["items"], items.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="City"
+                value={str(item.city)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, city: v };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="President"
+                value={str(item.president)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, president: v };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Members"
+                value={str(item.members)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, members: Number(v) || 0 };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Projects"
+                value={str(item.projects)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, projects: Number(v) || 0 };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Donations raised"
+                value={str(item.donations)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, donations: v };
+                  patch(["items"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "programs") {
+    const hero = asObj(sections.hero);
+    const items = asArr<{ title?: string; body?: string; stat?: string }>(sections.items);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Programs">
+          <ListToolbar
+            title="Program cards"
+            addLabel="Add program"
+            onAdd={() => patch(["items"], [...items, { title: "", body: "", stat: "" }])}
+          />
+          {items.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Program"
+              onRemove={() => patch(["items"], items.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Title"
+                value={str(item.title)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, title: v };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Stat badge"
+                value={str(item.stat)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, stat: v };
+                  patch(["items"], next);
+                }}
+              />
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Description"
+                  value={str(item.body)}
+                  multiline
+                  onChange={(v) => {
+                    const next = [...items];
+                    next[i] = { ...item, body: v };
+                    patch(["items"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "events") {
+    const hero = asObj(sections.hero);
+    const items = asArr<{
+      title?: string;
+      date?: string;
+      location?: string;
+      days?: number | string;
+      capacity?: string;
+    }>(sections.items);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Events">
+          <ListToolbar
+            title="Event cards"
+            addLabel="Add event"
+            onAdd={() =>
+              patch(["items"], [...items, { title: "", date: "", location: "", days: 0, capacity: "" }])
+            }
+          />
+          {items.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Event"
+              onRemove={() => patch(["items"], items.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Title"
+                value={str(item.title)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, title: v };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Date"
+                value={str(item.date)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, date: v };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Location / city"
+                value={str(item.location)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, location: v };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Days to go"
+                value={str(item.days)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, days: Number(v) || 0 };
+                  patch(["items"], next);
+                }}
+              />
+              <TextInput
+                label="Capacity"
+                value={str(item.capacity)}
+                onChange={(v) => {
+                  const next = [...items];
+                  next[i] = { ...item, capacity: v };
+                  patch(["items"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "gallery") {
+    const hero = asObj(sections.hero);
+    const items = asArr<{ caption?: string; imageUrl?: string }>(sections.items);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Gallery photos" description="Upload a photo and add a short caption for each item.">
+          <ListToolbar
+            title="Photos"
+            addLabel="Add photo"
+            onAdd={() => patch(["items"], [...items, { caption: "", imageUrl: "" }])}
+          />
+          {items.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Photo"
+              onRemove={() => patch(["items"], items.filter((_, j) => j !== i))}
+            >
+              <GalleryImageField
+                imageUrl={str(item.imageUrl)}
+                onUploaded={(url) => {
+                  const next = [...items];
+                  next[i] = { ...item, imageUrl: url };
+                  patch(["items"], next);
+                }}
+                onClear={() => {
+                  const next = [...items];
+                  next[i] = { ...item, imageUrl: "" };
+                  patch(["items"], next);
+                }}
+              />
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Caption"
+                  value={str(item.caption)}
+                  onChange={(v) => {
+                    const next = [...items];
+                    next[i] = { ...item, caption: v };
+                    patch(["items"], next);
+                  }}
+                  hint="Shown when people hover or open the photo"
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "faq") {
+    const hero = asObj(sections.hero);
+    const items = asArr<{ q?: string; a?: string }>(sections.items);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Questions & answers">
+          <ListToolbar
+            title="FAQs"
+            addLabel="Add question"
+            onAdd={() => patch(["items"], [...items, { q: "", a: "" }])}
+          />
+          {items.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="FAQ"
+              onRemove={() => patch(["items"], items.filter((_, j) => j !== i))}
+            >
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Question"
+                  value={str(item.q)}
+                  onChange={(v) => {
+                    const next = [...items];
+                    next[i] = { ...item, q: v };
+                    patch(["items"], next);
+                  }}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Answer"
+                  value={str(item.a)}
+                  multiline
+                  onChange={(v) => {
+                    const next = [...items];
+                    next[i] = { ...item, a: v };
+                    patch(["items"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "contact") {
+    const hero = asObj(sections.hero);
+    const details = asArr<{ label?: string; value?: string }>(sections.details);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Contact details">
+          <ListToolbar
+            title="Details"
+            addLabel="Add detail"
+            onAdd={() => patch(["details"], [...details, { label: "", value: "" }])}
+          />
+          {details.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Detail"
+              onRemove={() => patch(["details"], details.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Label"
+                value={str(item.label)}
+                onChange={(v) => {
+                  const next = [...details];
+                  next[i] = { ...item, label: v };
+                  patch(["details"], next);
+                }}
+              />
+              <TextInput
+                label="Value"
+                value={str(item.value)}
+                onChange={(v) => {
+                  const next = [...details];
+                  next[i] = { ...item, value: v };
+                  patch(["details"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "donate") {
+    const hero = asObj(sections.hero);
+    const causes = asArr<string>(sections.causes).map((c) => (typeof c === "string" ? c : ""));
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Donation options">
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Note under donate button"
+              value={str(sections.note)}
+              onChange={(v) => patch(["note"], v)}
+            />
+          </div>
+          <ListToolbar
+            title="Causes"
+            addLabel="Add cause"
+            onAdd={() => patch(["causes"], [...causes, "New cause"])}
+          />
+          {causes.map((c, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Cause"
+              onRemove={() => patch(["causes"], causes.filter((_, j) => j !== i))}
+            >
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Cause name"
+                  value={c}
+                  onChange={(v) => {
+                    const next = [...causes];
+                    next[i] = v;
+                    patch(["causes"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "volunteer") {
+    const hero = asObj(sections.hero);
+    const perks = asArr<{ title?: string; body?: string }>(sections.perks);
+    return (
+      <div className="space-y-5">
+        <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section title="Why volunteer">
+          <ListToolbar
+            title="Perks"
+            addLabel="Add perk"
+            onAdd={() => patch(["perks"], [...perks, { title: "", body: "" }])}
+          />
+          {perks.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Perk"
+              onRemove={() => patch(["perks"], perks.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Title"
+                value={str(item.title)}
+                onChange={(v) => {
+                  const next = [...perks];
+                  next[i] = { ...item, title: v };
+                  patch(["perks"], next);
+                }}
+              />
+              <TextInput
+                label="Description"
+                value={str(item.body)}
+                onChange={(v) => {
+                  const next = [...perks];
+                  next[i] = { ...item, body: v };
+                  patch(["perks"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+      </div>
+    );
+  }
+
+  if (page === "footer") {
+    const social = asObj(sections.social);
+    return (
+      <div className="space-y-5">
+        <Section title="Footer text">
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Organization tagline"
+              value={str(sections.tagline)}
+              onChange={(v) => patch(["tagline"], v)}
+              multiline
+            />
+          </div>
+          <TextInput
+            label="Newsletter title"
+            value={str(sections.newsletterTitle)}
+            onChange={(v) => patch(["newsletterTitle"], v)}
+          />
+          <TextInput
+            label="Copyright text"
+            value={str(sections.copyright)}
+            onChange={(v) => patch(["copyright"], v)}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Newsletter description"
+              value={str(sections.newsletterBody)}
+              onChange={(v) => patch(["newsletterBody"], v)}
+              multiline
+            />
+          </div>
+        </Section>
+        <Section title="Social media links" description="Paste full URLs (https://...).">
+          <TextInput
+            label="Facebook"
+            value={str(social.facebook)}
+            onChange={(v) => patch(["social", "facebook"], v)}
+          />
+          <TextInput
+            label="Instagram"
+            value={str(social.instagram)}
+            onChange={(v) => patch(["social", "instagram"], v)}
+          />
+          <TextInput
+            label="Twitter / X"
+            value={str(social.twitter)}
+            onChange={(v) => patch(["social", "twitter"], v)}
+          />
+          <TextInput
+            label="YouTube"
+            value={str(social.youtube)}
+            onChange={(v) => patch(["social", "youtube"], v)}
+          />
+        </Section>
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-sm text-muted-foreground">No form available for this page yet.</p>
+  );
+}
