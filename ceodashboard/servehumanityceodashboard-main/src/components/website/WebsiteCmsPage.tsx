@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, RotateCcw, Save, Sprout } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader, PageShell } from "@/components/dashboard/page-shell";
@@ -34,7 +34,6 @@ export function WebsiteCmsPage() {
   const [published, setPublished] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [seeding, setSeeding] = useState(false);
 
   const load = useCallback(async (p: string) => {
     setLoading(true);
@@ -71,63 +70,18 @@ export function WebsiteCmsPage() {
     }
   }
 
-  async function onReset() {
-    if (!confirm(`Reset ${websitePageLabel(page)} to default content?`)) return;
-    setSaving(true);
-    try {
-      const res = await api<{ success: true; data: WebsiteDoc }>(`/website/${page}/reset`, {
-        method: "POST",
-        body: "{}",
-      });
-      setDoc(res.data);
-      setPublished(true);
-      setSections((res.data.sections ?? {}) as Record<string, unknown>);
-      toast.success("Reset to defaults");
-    } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Reset failed");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function onSeedAll() {
-    setSeeding(true);
-    try {
-      const res = await api<{ success: true; message: string; created: number }>("/website/seed", {
-        method: "POST",
-        body: "{}",
-      });
-      toast.success(res.message);
-      await load(page);
-    } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Seed failed");
-    } finally {
-      setSeeding(false);
-    }
-  }
-
   const meta = WEBSITE_PAGES.find((p) => p.key === page);
 
   return (
     <PageShell>
       <PageHeader
         title="Website CMS"
-        description="Edit key website content. Only CEO and Media BOG can access this."
+        description="Edit website content below. Changes save to the database and appear on the live site after you save."
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" disabled={seeding} onClick={() => void onSeedAll()}>
-              {seeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sprout className="h-4 w-4" />}
-              Seed defaults
-            </Button>
-            <Button variant="outline" disabled={saving || loading} onClick={() => void onReset()}>
-              <RotateCcw className="h-4 w-4" />
-              Reset page
-            </Button>
-            <Button disabled={saving || loading} onClick={() => void onSave()}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save & publish
-            </Button>
-          </div>
+          <Button disabled={saving || loading} onClick={() => void onSave()}>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save & publish
+          </Button>
         }
       />
 

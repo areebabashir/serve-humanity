@@ -4,7 +4,6 @@ import About from "./routes/about";
 import Mission from "./routes/mission";
 import Leadership from "./routes/leadership";
 import Chapters from "./routes/chapters";
-import Programs from "./routes/programs";
 import Events from "./routes/events";
 import Gallery from "./routes/gallery";
 import Volunteer from "./routes/volunteer";
@@ -66,9 +65,10 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/about" element={<About />} />
       <Route path="/mission" element={<Mission />} />
-      <Route path="/leadership" element={<Leadership />} />
+      <Route path="/team" element={<Leadership />} />
+      <Route path="/leadership" element={<Navigate to="/team" replace />} />
       <Route path="/chapters" element={<Chapters />} />
-      <Route path="/programs" element={<Programs />} />
+      <Route path="/programs" element={<Navigate to="/about#programs" replace />} />
       <Route path="/events" element={<Events />} />
       <Route path="/gallery" element={<Gallery />} />
       <Route path="/volunteer" element={<Volunteer />} />

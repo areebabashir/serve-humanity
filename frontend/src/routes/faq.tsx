@@ -30,7 +30,7 @@ export default function Page() {
           title={highlightTitle(hero.title || "Common questions", hero.titleHighlight)}
           description={hero.description}
         />
-        <section className="container-page pb-24 max-w-3xl mx-auto">
+        <section className="page-section max-w-3xl mx-auto">
           <Reveal>
             <Accordion type="single" collapsible className="space-y-3">
               {faqs.map((f, i) => (

@@ -28,6 +28,44 @@ type HomeSections = {
     secondaryCtaLink?: string;
   };
   stats?: { label: string; value: string }[];
+  partners?: {
+    title?: string;
+    items?: { name?: string; logoUrl?: string }[];
+    names?: string[];
+  };
+  story?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+    body?: string;
+    points?: string[];
+    cta?: string;
+    ctaLink?: string;
+    quote?: string;
+    quoteAttr?: string;
+    estLabel?: string;
+    sideStats?: { value?: string; label?: string }[];
+  };
+  principles?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+    subtitle?: string;
+    items?: { title?: string; desc?: string }[];
+  };
+  impact?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+    body?: string;
+    stats?: { label?: string; end?: number; suffix?: string }[];
+  };
+  eightWays?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+    items?: { title?: string; desc?: string }[];
+  };
 };
 
 export default function Page() {
@@ -47,8 +85,7 @@ export default function Page() {
 
 
 /* ---------------- HERO ---------------- */
-function Hero() {
-  const { sections } = useWebsitePage<HomeSections>("home");
+function Hero({ sections }: { sections: HomeSections }) {
   const hero = sections.hero ?? {};
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
@@ -183,42 +220,11 @@ function Hero() {
               <HandHeart className="h-4 w-4" />
               {hero.secondaryCta || "Become Volunteer"}
             </Link>
-            <button
-              type="button"
-              className="group inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-foreground/80 hover:text-foreground"
-            >
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-blue text-white shadow-cool transition-transform group-hover:scale-110">
-                <Play className="h-3.5 w-3.5 fill-white" />
-              </span>
-              Watch our story
-            </button>
+           
           </motion.div>
 
           {/* trust row */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.9, duration: 0.8 }}
-            className="mt-10 flex items-center gap-6 text-xs text-muted-foreground"
-          >
-            <div className="flex -space-x-2">
-              {["#F89C1B", "#234A8F", "#F45D22", "#3A5DAA"].map((c, i) => (
-                <div
-                  key={i}
-                  className="h-8 w-8 rounded-full border-2 border-background"
-                  style={{ background: c }}
-                />
-              ))}
-            </div>
-            <div>
-              <div className="flex items-center gap-0.5 text-brand-orange">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="h-3 w-3 fill-current" />
-                ))}
-              </div>
-              <p className="mt-0.5"><b className="text-foreground">12,500+</b> volunteers already joined</p>
-            </div>
-          </motion.div>
+          
         </div>
 
         {/* Right — glass dashboard */}
@@ -270,27 +276,26 @@ function Hero() {
 }
 
 /* ---------------- ABOUT ---------------- */
-function About() {
-  const points = [
-    "Founded in 2014 with a single food drive — now a movement of thousands.",
-    "Independently audited. 92¢ of every rupee reaches beneficiaries directly.",
-    "Present in 36 cities with local chapters led by trusted community leaders.",
-  ];
+function About({ sections }: { sections: HomeSections }) {
+  const story = sections.story ?? {};
+  const points = (story.points ?? []).filter(Boolean);
+  const sideStats = story.sideStats ?? [];
+  const title = story.title || "A decade of turning";
+  const highlight = story.titleHighlight || "compassion into action";
+
   return (
     <section className="relative py-24">
       <div className="container-page grid gap-12 lg:grid-cols-2 lg:items-center">
         <Reveal>
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-            Our story
+            {story.eyebrow || "Our story"}
           </span>
           <h2 className="mt-3 font-display text-3xl font-bold leading-tight md:text-5xl">
-            A decade of turning{" "}
-            <span className="text-gradient-brand">compassion into action</span>
+            {title}{" "}
+            <span className="text-gradient-brand">{highlight}</span>
           </h2>
           <p className="mt-5 text-muted-foreground md:text-lg">
-            Serve Humanity began as a small circle of friends who couldn't sit still
-            while their neighbours went hungry. Today we're an organized humanitarian
-            movement — but the heart remains unchanged: humans, showing up for humans.
+            {story.body}
           </p>
           <ul className="mt-8 space-y-3">
             {points.map((p, i) => (
@@ -304,10 +309,10 @@ function About() {
           </ul>
           <div className="mt-8">
             <Link
-              to="/about"
+              to={story.ctaLink || "/about"}
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:gap-2.5 transition-all"
             >
-              Read our full story <ArrowRight className="h-4 w-4" />
+              {story.cta || "Read our full story"} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </Reveal>
@@ -321,22 +326,18 @@ function About() {
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest backdrop-blur">
                   <span className="h-1.5 w-1.5 rounded-full bg-brand-orange animate-pulse" />
-                  Est. 2014
+                  {story.estLabel || "Est. 2014"}
                 </div>
                 <blockquote className="mt-8 font-display text-2xl font-medium leading-tight md:text-3xl">
-                  "You can't help everyone, but everyone can help someone."
+                  "{story.quote}"
                 </blockquote>
-                <p className="mt-4 text-sm text-white/70">— Our founding principle</p>
+                <p className="mt-4 text-sm text-white/70">{story.quoteAttr}</p>
               </div>
               <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6">
-                {[
-                  { v: "10+", l: "Years" },
-                  { v: "36", l: "Chapters" },
-                  { v: "48K", l: "Lives" },
-                ].map((s) => (
-                  <div key={s.l}>
-                    <div className="font-display text-3xl font-bold">{s.v}</div>
-                    <div className="text-[11px] uppercase tracking-widest text-white/60">{s.l}</div>
+                {sideStats.map((s) => (
+                  <div key={s.label}>
+                    <div className="font-display text-3xl font-bold">{s.value}</div>
+                    <div className="text-[11px] uppercase tracking-widest text-white/60">{s.label}</div>
                   </div>
                 ))}
               </div>
@@ -349,35 +350,43 @@ function About() {
 }
 
 /* ---------------- VALUES ---------------- */
-function Values() {
-  const values = [
-    { icon: Heart, title: "Compassion", desc: "We listen first. Every person we serve is met with dignity, not pity.", color: "from-brand-accent to-brand-orange" },
-    { icon: Shield, title: "Trust", desc: "Every rupee is tracked. Every family receipt is verified.", color: "from-brand-blue to-brand-blue-light" },
-    { icon: Eye, title: "Transparency", desc: "Public reports. Open books. Audited yearly, without exception.", color: "from-success to-brand-blue" },
-    { icon: Handshake, title: "Integrity", desc: "We keep promises. Our word is our foundation.", color: "from-brand-orange to-brand-accent" },
-    { icon: Lightbulb, title: "Empowerment", desc: "We teach skills, not just deliver aid. Sustainable change matters.", color: "from-brand-blue-light to-brand-orange" },
-    { icon: Globe2, title: "Unity", desc: "Faiths, backgrounds, borders — humanity is one family.", color: "from-brand-accent to-brand-blue" },
+function Values({ sections }: { sections: HomeSections }) {
+  const principles = sections.principles ?? {};
+  const VALUE_META = [
+    { icon: Heart, color: "from-brand-accent to-brand-orange" },
+    { icon: Shield, color: "from-brand-blue to-brand-blue-light" },
+    { icon: Eye, color: "from-success to-brand-blue" },
+    { icon: Handshake, color: "from-brand-orange to-brand-accent" },
+    { icon: Lightbulb, color: "from-brand-blue-light to-brand-orange" },
+    { icon: Globe2, color: "from-brand-accent to-brand-blue" },
   ];
+  const values = (principles.items ?? []).map((item, i) => ({
+    title: item.title || "",
+    desc: item.desc || "",
+    icon: VALUE_META[i % VALUE_META.length].icon,
+    color: VALUE_META[i % VALUE_META.length].color,
+  }));
+
   return (
     <section className="relative py-24">
       <div className="container-page">
         <Reveal className="mx-auto max-w-2xl text-center">
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-            Core values
+            {principles.eyebrow || "Core values"}
           </span>
           <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-            The principles that <span className="text-gradient-brand">guide every act</span>
+            {principles.title || "The principles that"}{" "}
+            <span className="text-gradient-brand">{principles.titleHighlight || "guide every act"}</span>
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Six commitments we make to every community, every donor, every volunteer.
+            {principles.subtitle}
           </p>
         </Reveal>
 
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {values.map((v, i) => (
-            <Reveal key={v.title} delay={i}>
+            <Reveal key={`${v.title}-${i}`} delay={i}>
               <div className="group relative h-full overflow-hidden rounded-3xl border border-border bg-card p-7 shadow-soft transition-all duration-500 hover:-translate-y-1 hover:shadow-elevated">
-                {/* animated border */}
                 <div className="pointer-events-none absolute inset-0 rounded-3xl opacity-0 transition-opacity duration-500 group-hover:opacity-100">
                   <div className={`absolute inset-0 rounded-3xl bg-gradient-to-br ${v.color} opacity-10`} />
                 </div>
@@ -399,13 +408,14 @@ function Values() {
 }
 
 /* ---------------- IMPACT ---------------- */
-function Impact() {
-  const stats = [
-    { end: 48200, suffix: "+", label: "Families Helped" },
-    { end: 12500, suffix: "", label: "Active Volunteers" },
-    { end: 36, suffix: "", label: "City Chapters" },
-    { end: 210, suffix: "K", label: "Food Packages" },
-  ];
+function Impact({ sections }: { sections: HomeSections }) {
+  const impact = sections.impact ?? {};
+  const stats = (impact.stats ?? []).map((s) => ({
+    end: Number(s.end) || 0,
+    suffix: s.suffix || "",
+    label: s.label || "",
+  }));
+
   return (
     <section className="relative overflow-hidden py-24">
       <div className="absolute inset-0 bg-gradient-cool" />
@@ -423,20 +433,20 @@ function Impact() {
       <div className="container-page relative text-white">
         <Reveal className="mx-auto max-w-2xl text-center">
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-            Measured impact
+            {impact.eyebrow || "Measured impact"}
           </span>
           <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-            Numbers that represent{" "}
-            <span className="text-gradient-warm">real people</span>
+            {impact.title || "Numbers that represent"}{" "}
+            <span className="text-gradient-warm">{impact.titleHighlight || "real people"}</span>
           </h2>
           <p className="mt-4 text-white/70">
-            Every count is a family fed, a child in school, a neighbour who felt seen.
+            {impact.body}
           </p>
         </Reveal>
 
         <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((s, i) => (
-            <Reveal key={s.label} delay={i}>
+            <Reveal key={`${s.label}-${i}`} delay={i}>
               <div className="group relative rounded-3xl border border-white/10 bg-white/5 p-7 text-center backdrop-blur-md transition hover:-translate-y-1 hover:bg-white/10">
                 <div className="font-display text-5xl font-bold tracking-tight">
                   <CountUpComponent end={s.end} duration={2.4} separator="," enableScrollSpy scrollSpyOnce />
@@ -574,28 +584,35 @@ function Chapters() {
 }
 
 /* ---------------- PROGRAMS (Bento) ---------------- */
-function Programs() {
-  const cards = [
-    { icon: Utensils, title: "Food Security", desc: "Weekly rations, hot meals & Ramadan drives.", cls: "md:col-span-2 md:row-span-2 bg-gradient-warm text-white", size: "big" },
-    { icon: GraduationCap, title: "Education", desc: "Scholarships & school supplies for 8,400 children.", cls: "bg-card" },
-    { icon: Stethoscope, title: "Healthcare", desc: "Free clinics, medicines & maternal care.", cls: "bg-card" },
-    { icon: LifeBuoy, title: "Emergency Relief", desc: "Floods, quakes, displacement — rapid response.", cls: "md:col-span-2 bg-gradient-cool text-white" },
-    { icon: Baby, title: "Orphan Care", desc: "Sponsorship & family support programs.", cls: "bg-card" },
-    { icon: Heart, title: "Women Empowerment", desc: "Skills training & micro-grants for women.", cls: "bg-card" },
-    { icon: Droplets, title: "Clean Water", desc: "Wells, filters & rural infrastructure.", cls: "bg-card" },
-    { icon: Lightbulb, title: "Skills Development", desc: "Free vocational training & job placement.", cls: "bg-card" },
+function Programs({ sections }: { sections: HomeSections }) {
+  const eightWays = sections.eightWays ?? {};
+  const PROGRAM_META = [
+    { icon: Utensils, cls: "md:col-span-2 md:row-span-2 bg-gradient-warm text-white" },
+    { icon: GraduationCap, cls: "bg-card" },
+    { icon: Stethoscope, cls: "bg-card" },
+    { icon: LifeBuoy, cls: "md:col-span-2 bg-gradient-cool text-white" },
+    { icon: Baby, cls: "bg-card" },
+    { icon: Heart, cls: "bg-card" },
+    { icon: Droplets, cls: "bg-card" },
+    { icon: Lightbulb, cls: "bg-card" },
   ];
+  const cards = (eightWays.items ?? []).map((item, i) => ({
+    title: item.title || "",
+    desc: item.desc || "",
+    icon: PROGRAM_META[i % PROGRAM_META.length].icon,
+    cls: PROGRAM_META[i % PROGRAM_META.length].cls,
+  }));
 
   return (
     <section className="relative py-24">
       <div className="container-page">
         <Reveal className="mx-auto max-w-2xl text-center">
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-            Programs
+            {eightWays.eyebrow || "Programs"}
           </span>
           <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-            Eight ways we show up{" "}
-            <span className="text-gradient-brand">every single day</span>
+            {eightWays.title || "Eight ways we show up"}{" "}
+            <span className="text-gradient-brand">{eightWays.titleHighlight || "every single day"}</span>
           </h2>
         </Reveal>
 
@@ -605,7 +622,7 @@ function Programs() {
             const isDark = c.cls.includes("text-white");
             return (
               <Reveal
-                key={c.title}
+                key={`${c.title}-${i}`}
                 delay={i}
                 className={`group relative overflow-hidden rounded-3xl border ${isDark ? "border-white/10" : "border-border"} p-6 shadow-soft transition-all duration-500 hover:-translate-y-1 hover:shadow-elevated ${c.cls}`}
               >
@@ -895,25 +912,8 @@ function DonateCTA() {
 }
 
 /* ---------------- SPONSORS ---------------- */
-function Sponsors() {
-  const { sections } = useWebsitePage<{
-    partners?: {
-      title?: string;
-      items?: { name?: string; logoUrl?: string }[];
-      names?: string[];
-    };
-  }>("home");
+function Sponsors({ sections }: { sections: HomeSections }) {
   const partners = sections.partners ?? {};
-  const fallback = [
-    { name: "UNICEF", logoUrl: "" },
-    { name: "Red Crescent", logoUrl: "" },
-    { name: "WHO Partners", logoUrl: "" },
-    { name: "UNHCR", logoUrl: "" },
-    { name: "Save the Children", logoUrl: "" },
-    { name: "OXFAM", logoUrl: "" },
-    { name: "Care Intl.", logoUrl: "" },
-    { name: "Islamic Relief", logoUrl: "" },
-  ];
   const items: { name: string; logoUrl: string }[] = (() => {
     if (partners.items?.length) {
       return partners.items
@@ -923,35 +923,61 @@ function Sponsors() {
     if (partners.names?.length) {
       return partners.names.filter(Boolean).map((name) => ({ name, logoUrl: "" }));
     }
-    return fallback;
+    return [];
   })();
-  const row = [...items, ...items];
+
+  if (!items.length) return null;
+
+  // Triple the row for a smoother endless scroll when there are few partners
+  const row = items.length < 6 ? [...items, ...items, ...items] : [...items, ...items];
+
   return (
-    <section className="py-16 border-y border-border bg-secondary/40">
-      <div className="container-page">
-        <p className="text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          {partners.title || "Trusted by partners around the world"}
-        </p>
-        <div className="mt-8 overflow-hidden group">
-          <div className="flex w-max animate-marquee items-center gap-14 group-hover:[animation-play-state:paused]">
+    <section className="relative overflow-hidden border-y border-brand-blue/10 bg-gradient-to-b from-secondary/80 via-white to-secondary/60 py-14 md:py-16">
+      <div className="pointer-events-none absolute -left-16 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-brand-orange/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full bg-brand-blue/10 blur-3xl" />
+
+      <div className="container-page relative">
+        <div className="mx-auto max-w-xl text-center">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-gradient-warm" />
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-blue">
+            {partners.title || "Trusted by partners around the world"}
+          </p>
+        </div>
+      </div>
+
+      <div className="relative mt-8">
+        {/* Edge fades */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-white to-transparent md:w-28" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-white to-transparent md:w-28" />
+
+        <div className="group overflow-hidden py-2">
+          <div className="flex w-max animate-marquee items-stretch gap-5 group-hover:[animation-play-state:paused] md:gap-6">
             {row.map((p, i) => (
-              <span
-                key={i}
-                className="inline-flex h-12 min-w-[7rem] items-center justify-center grayscale transition-all hover:grayscale-0"
+              <div
+                key={`${p.name}-${i}`}
                 title={p.name}
+                className="flex w-[9.5rem] shrink-0 flex-col items-center justify-center gap-2.5 rounded-2xl border border-brand-blue/10 bg-white px-4 py-4 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:border-brand-orange/30 hover:shadow-elevated md:w-[11rem] md:px-5 md:py-5"
               >
-                {p.logoUrl ? (
-                  <img
-                    src={p.logoUrl}
-                    alt={p.name || "Partner"}
-                    className="max-h-10 max-w-[140px] object-contain opacity-70 transition-opacity hover:opacity-100"
-                  />
-                ) : (
-                  <span className="font-display text-2xl font-bold text-muted-foreground/50 transition-colors hover:text-brand-blue">
+                <div className="grid h-14 w-full place-items-center md:h-16">
+                  {p.logoUrl ? (
+                    <img
+                      src={p.logoUrl}
+                      alt={p.name || "Partner logo"}
+                      className="max-h-14 max-w-full object-contain transition duration-300 md:max-h-16"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-cool font-display text-sm font-bold text-white">
+                      {(p.name || "?").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                {p.name ? (
+                  <span className="line-clamp-1 text-center text-[11px] font-semibold text-muted-foreground md:text-xs">
                     {p.name}
                   </span>
-                )}
-              </span>
+                ) : null}
+              </div>
             ))}
           </div>
         </div>
@@ -983,15 +1009,16 @@ function BackToTop() {
 
 /* ---------------- HOME ---------------- */
 function HomePage() {
+  const { sections } = useWebsitePage<HomeSections>("home");
   return (
     <SiteLayout>
-      <Hero />
-      <Sponsors />
-      <About />
-      <Values />
-      <Impact />
+      <Hero sections={sections} />
+      <Sponsors sections={sections} />
+      <About sections={sections} />
+      <Values sections={sections} />
+      <Impact sections={sections} />
       <Chapters />
-      <Programs />
+      <Programs sections={sections} />
       <Timeline />
       <Events />
       <Testimonials />

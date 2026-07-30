@@ -22,6 +22,31 @@ export async function getAllChapters(req, res, next) {
   }
 }
 
+/** Public website listing — active chapters only, display fields. */
+export async function getPublicChapters(req, res, next) {
+  try {
+    const chapters = await Chapter.find({ status: "active" })
+      .populate("president", "name")
+      .sort({ city: 1, name: 1 })
+      .lean();
+
+    const data = chapters.map((c) => ({
+      id: String(c._id),
+      name: c.name,
+      city: c.city,
+      president: c.president?.name || "TBD",
+      members: c.memberCount ?? 0,
+      projects: c.casesClosed ?? 0,
+      events: c.totalEvents ?? 0,
+      fundsRaised: c.fundsRaised ?? 0,
+    }));
+
+    res.json({ success: true, total: data.length, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getChapter(req, res, next) {
   try {
     const chapter = await Chapter.findById(req.params.id).populate("president", PRESIDENT_FIELDS);
@@ -377,7 +402,29 @@ export async function updateChapter(req, res, next) {
 
 export async function deleteChapter(req, res, next) {
   try {
-    await Chapter.findByIdAndDelete(req.params.id);
+    const chapter = await Chapter.findById(req.params.id);
+    if (!chapter) {
+      return res.status(404).json({ success: false, message: "Chapter not found." });
+    }
+
+    const chapterId = chapter._id;
+
+    // Unlink users from this chapter (keep accounts; clear chapter assignment)
+    await User.updateMany(
+      { chapter: chapterId },
+      { $set: { chapter: null, chapterRole: "member" } },
+    );
+
+    // Clear president role if they were chapter president
+    if (chapter.president) {
+      await User.updateOne(
+        { _id: chapter.president, systemRole: "president" },
+        { $set: { systemRole: "member" } },
+      );
+    }
+
+    await Chapter.findByIdAndDelete(chapterId);
+
     res.json({ success: true, message: "Chapter deleted." });
   } catch (err) {
     next(err);

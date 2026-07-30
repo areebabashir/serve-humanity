@@ -39,7 +39,7 @@ function VolunteerPage() {
         title={highlightTitle(hero.title || "Join the mission", hero.titleHighlight)}
         description={hero.description}
       />
-      <section className="container-page pb-24">
+      <section className="page-section">
         <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
           <Reveal className="relative overflow-hidden rounded-3xl bg-gradient-warm p-8 md:p-10 text-white shadow-warm">
             <div className="absolute inset-0 bg-mesh opacity-30" />

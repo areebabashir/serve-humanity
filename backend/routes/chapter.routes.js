@@ -2,6 +2,7 @@ import { Router } from "express";
 import { protect, requireRole, requireCeoDashboard } from "../middleware/auth.js";
 import {
   getAllChapters,
+  getPublicChapters,
   getChapter,
   getChapterHeads,
   getChapterDetails,
@@ -14,6 +15,7 @@ import {
 
 const router = Router();
 
+router.get("/public", getPublicChapters);
 router.get("/", getAllChapters);
 router.get("/:id/heads", getChapterHeads);
 router.get("/:id/details", protect, requireCeoDashboard, getChapterDetails);

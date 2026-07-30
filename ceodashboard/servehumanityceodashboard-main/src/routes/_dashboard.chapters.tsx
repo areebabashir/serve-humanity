@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Eye, Loader2, Plus, Search, UserCog } from "lucide-react";
+import { Eye, Loader2, Plus, Search, Trash2, UserCog } from "lucide-react";
 
 import { PageHeader, PageShell } from "@/components/dashboard/page-shell";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,16 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
@@ -186,6 +196,8 @@ function ChaptersPage() {
   const [newPresidentId, setNewPresidentId] = useState("");
   const [deactivatePrevious, setDeactivatePrevious] = useState(true);
   const [presidentActionLoading, setPresidentActionLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ChapterRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -312,6 +324,26 @@ function ChaptersPage() {
       toast.error(err instanceof ApiRequestError ? err.message : "Failed to create chapter");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onDeleteChapter() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api(`/chapters/${deleteTarget._id}`, { method: "DELETE" });
+      toast.success(`Chapter "${deleteTarget.name}" deleted`);
+      if (detailChapterId === deleteTarget._id) {
+        setDetailOpen(false);
+        setDetailChapterId(null);
+        setDetails(null);
+      }
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to delete chapter");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -473,10 +505,23 @@ function ChaptersPage() {
                   </TableCell>
                   <TableCell>{formatDate(c.established)}</TableCell>
                   <TableCell className="text-right">
-                    <Button size="sm" variant="outline" onClick={() => void openDetails(c._id)}>
-                      <Eye className="h-3.5 w-3.5" />
-                      View
-                    </Button>
+                    <div className="inline-flex items-center justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void openDetails(c._id)}>
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </Button>
+                      {isCeo ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => setDeleteTarget(c)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -493,6 +538,20 @@ function ChaptersPage() {
               {chapter ? `${chapter.city} · Full profile, donations, team & contacts` : "Loading chapter profile…"}
             </SheetDescription>
           </SheetHeader>
+
+          {isCeo && chapter ? (
+            <div className="mt-3 flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteTarget(chapter)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete chapter
+              </Button>
+            </div>
+          ) : null}
 
           {detailLoading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -923,6 +982,39 @@ function ChaptersPage() {
           ) : null}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chapter?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <b>{deleteTarget?.name}</b>
+              {deleteTarget?.city ? ` (${deleteTarget.city})` : ""}. Users linked to this chapter will be
+              unassigned. Related donations and cases are not deleted from history. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault();
+                void onDeleteChapter();
+              }}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Delete chapter
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }

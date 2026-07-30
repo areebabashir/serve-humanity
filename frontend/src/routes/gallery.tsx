@@ -54,7 +54,7 @@ function GalleryPage() {
         title={highlightTitle(hero.title || "Moments from the field", hero.titleHighlight)}
         description={hero.description}
       />
-      <section className="container-page pb-24">
+      <section className="page-section">
         <div className="columns-1 gap-4 sm:columns-2 md:columns-3 [column-fill:_balance]">
           {Array.from({ length: count }).map((_, i) => {
             const item = items[i] || {};

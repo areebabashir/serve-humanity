@@ -55,7 +55,7 @@ function DonatePage() {
         title={highlightTitle(hero.title || "Your gift, multiplied", hero.titleHighlight)}
         description={hero.description}
       />
-      <section className="container-page pb-24">
+      <section className="page-section">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
           <Reveal>
             <div className="rounded-3xl border border-border bg-card p-6 shadow-elevated md:p-8">

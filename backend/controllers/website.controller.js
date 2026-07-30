@@ -8,6 +8,52 @@ function canEditWebsite(user) {
   return WEBSITE_EDITORS.has(user?.systemRole);
 }
 
+/** Fill missing section keys from defaults (keeps saved edits).
+ *  Team/leadership is CMS-driven — never inject dummy people from defaults.
+ *  About deep-merges nested blocks (founder, ceo, programs) so new fields always appear in CMS. */
+function withDefaultSections(page, sections) {
+  if (page === "leadership" || page === "chapters") {
+    // Don't inject dummy lists — Team people & chapter cards come from live DB / CMS saves only
+    const remote = sections && typeof sections === "object" ? sections : {};
+    if (page === "chapters") {
+      const defaults = DEFAULT_WEBSITE_CONTENT.chapters || {};
+      return {
+        hero: { ...(defaults.hero || {}), ...(remote.hero || {}) },
+        items: [],
+      };
+    }
+    return remote;
+  }
+  const defaults = DEFAULT_WEBSITE_CONTENT[page] || {};
+  const remote = sections && typeof sections === "object" ? sections : {};
+  if (page !== "about") {
+    return { ...defaults, ...remote };
+  }
+
+  const merged = { ...defaults, ...remote };
+  for (const key of ["hero", "story", "founder", "ceo", "programs"]) {
+    const d = defaults[key] && typeof defaults[key] === "object" ? defaults[key] : {};
+    const r = remote[key] && typeof remote[key] === "object" ? remote[key] : {};
+    merged[key] = { ...d, ...r };
+  }
+  if (!Array.isArray(merged.values) || merged.values.length === 0) {
+    merged.values = defaults.values || [];
+  }
+  if (!Array.isArray(merged.programs?.items) || merged.programs.items.length === 0) {
+    merged.programs = {
+      ...(merged.programs || {}),
+      items: defaults.programs?.items || [],
+    };
+  }
+  if (!Array.isArray(merged.story?.paragraphs) || merged.story.paragraphs.length === 0) {
+    merged.story = {
+      ...(merged.story || {}),
+      paragraphs: defaults.story?.paragraphs || [],
+    };
+  }
+  return merged;
+}
+
 /** Public: all published pages (or one page). */
 export async function getPublicWebsite(req, res, next) {
   try {
@@ -18,12 +64,14 @@ export async function getPublicWebsite(req, res, next) {
       }
       let doc = await SiteContent.findOne({ page, published: true }).lean();
       if (!doc) {
-        // Return defaults so the site never breaks before seeding
         doc = {
           page,
-          sections: DEFAULT_WEBSITE_CONTENT[page] || {},
+          // Team page: empty until CMS saves — no dummy roster
+          sections: page === "leadership" ? { hero: { title: "Team" }, groups: [] } : DEFAULT_WEBSITE_CONTENT[page] || {},
           published: true,
         };
+      } else {
+        doc = { ...doc, sections: withDefaultSections(page, doc.sections) };
       }
       return res.json({ success: true, data: doc });
     }
@@ -31,7 +79,9 @@ export async function getPublicWebsite(req, res, next) {
     const docs = await SiteContent.find({ published: true }).lean();
     const byPage = Object.fromEntries(docs.map((d) => [d.page, d]));
     const data = WEBSITE_PAGES.map((p) => {
-      if (byPage[p]) return byPage[p];
+      if (byPage[p]) {
+        return { ...byPage[p], sections: withDefaultSections(p, byPage[p].sections) };
+      }
       return {
         page: p,
         sections: DEFAULT_WEBSITE_CONTENT[p] || {},
@@ -56,7 +106,9 @@ export async function listWebsitePages(req, res, next) {
       .lean();
     const byPage = Object.fromEntries(docs.map((d) => [d.page, d]));
     const data = WEBSITE_PAGES.map((p) => {
-      if (byPage[p]) return byPage[p];
+      if (byPage[p]) {
+        return { ...byPage[p], sections: withDefaultSections(p, byPage[p].sections) };
+      }
       return {
         _id: null,
         page: p,
@@ -93,6 +145,8 @@ export async function getWebsitePage(req, res, next) {
         updatedAt: null,
         updatedBy: null,
       };
+    } else {
+      doc = { ...doc, sections: withDefaultSections(page, doc.sections) };
     }
     res.json({ success: true, data: doc });
   } catch (err) {

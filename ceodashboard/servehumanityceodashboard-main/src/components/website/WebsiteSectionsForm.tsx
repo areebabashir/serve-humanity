@@ -282,6 +282,15 @@ export function WebsiteSectionsForm({
   if (page === "home") {
     const hero = asObj(sections.hero);
     const stats = asArr<{ label?: string; value?: string }>(sections.stats);
+    const story = asObj(sections.story);
+    const storyPoints = asArr<string>(story.points).map((p) => (typeof p === "string" ? p : ""));
+    const sideStats = asArr<{ value?: string; label?: string }>(story.sideStats);
+    const principles = asObj(sections.principles);
+    const principleItems = asArr<{ title?: string; desc?: string }>(principles.items);
+    const impact = asObj(sections.impact);
+    const impactStats = asArr<{ label?: string; end?: number | string; suffix?: string }>(impact.stats);
+    const eightWays = asObj(sections.eightWays);
+    const eightItems = asArr<{ title?: string; desc?: string }>(eightWays.items);
     const about = asObj(sections.aboutTeaser);
     const donate = asObj(sections.donateCta);
     const partners = asObj(sections.partners);
@@ -297,7 +306,7 @@ export function WebsiteSectionsForm({
     return (
       <div className="space-y-5">
         <HeroFields hero={hero} variant="home" onChange={(h) => patch(["hero"], h)} />
-        <Section title="Impact numbers" description="Stats shown under the home banner.">
+        <Section title="Hero impact cards" description="Live stats shown beside the home banner.">
           <ListToolbar
             title="Stats"
             addLabel="Add stat"
@@ -331,6 +340,287 @@ export function WebsiteSectionsForm({
             </ItemCard>
           ))}
         </Section>
+
+        <Section title="Our story" description="Homepage story section with quote card.">
+          <TextInput label="Small label" value={str(story.eyebrow)} onChange={(v) => patch(["story", "eyebrow"], v)} />
+          <TextInput label="Title (first part)" value={str(story.title)} onChange={(v) => patch(["story", "title"], v)} />
+          <TextInput
+            label="Highlighted title words"
+            value={str(story.titleHighlight)}
+            onChange={(v) => patch(["story", "titleHighlight"], v)}
+          />
+          <div className="sm:col-span-2">
+            <TextInput label="Body" value={str(story.body)} onChange={(v) => patch(["story", "body"], v)} multiline />
+          </div>
+          <TextInput label="Button text" value={str(story.cta)} onChange={(v) => patch(["story", "cta"], v)} />
+          <TextInput label="Button link" value={str(story.ctaLink)} onChange={(v) => patch(["story", "ctaLink"], v)} />
+          <TextInput label="Quote card label" value={str(story.estLabel)} onChange={(v) => patch(["story", "estLabel"], v)} />
+          <TextInput label="Quote attribution" value={str(story.quoteAttr)} onChange={(v) => patch(["story", "quoteAttr"], v)} />
+          <div className="sm:col-span-2">
+            <TextInput label="Quote" value={str(story.quote)} onChange={(v) => patch(["story", "quote"], v)} multiline />
+          </div>
+          <ListToolbar
+            title="Story bullet points"
+            addLabel="Add point"
+            onAdd={() => patch(["story", "points"], [...storyPoints, ""])}
+          />
+          {storyPoints.map((p, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Point"
+              onRemove={() => patch(["story", "points"], storyPoints.filter((_, j) => j !== i))}
+            >
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Text"
+                  value={p}
+                  multiline
+                  onChange={(v) => {
+                    const next = [...storyPoints];
+                    next[i] = v;
+                    patch(["story", "points"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+          <ListToolbar
+            title="Quote card stats"
+            addLabel="Add stat"
+            onAdd={() => patch(["story", "sideStats"], [...sideStats, { value: "0", label: "Label" }])}
+          />
+          {sideStats.map((s, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Side stat"
+              onRemove={() => patch(["story", "sideStats"], sideStats.filter((_, j) => j !== i))}
+            >
+              <TextInput
+                label="Value"
+                value={str(s.value)}
+                onChange={(v) => {
+                  const next = [...sideStats];
+                  next[i] = { ...s, value: v };
+                  patch(["story", "sideStats"], next);
+                }}
+              />
+              <TextInput
+                label="Label"
+                value={str(s.label)}
+                onChange={(v) => {
+                  const next = [...sideStats];
+                  next[i] = { ...s, label: v };
+                  patch(["story", "sideStats"], next);
+                }}
+              />
+            </ItemCard>
+          ))}
+        </Section>
+
+        <Section title="Principles (core values)" description="Six commitment cards on the home page.">
+          <TextInput
+            label="Small label"
+            value={str(principles.eyebrow)}
+            onChange={(v) => patch(["principles", "eyebrow"], v)}
+          />
+          <TextInput
+            label="Title (first part)"
+            value={str(principles.title)}
+            onChange={(v) => patch(["principles", "title"], v)}
+          />
+          <TextInput
+            label="Highlighted title words"
+            value={str(principles.titleHighlight)}
+            onChange={(v) => patch(["principles", "titleHighlight"], v)}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Subtitle"
+              value={str(principles.subtitle)}
+              onChange={(v) => patch(["principles", "subtitle"], v)}
+              multiline
+            />
+          </div>
+          <ListToolbar
+            title="Principles"
+            addLabel="Add principle"
+            onAdd={() =>
+              patch(["principles", "items"], [...principleItems, { title: "New principle", desc: "" }])
+            }
+          />
+          {principleItems.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Principle"
+              onRemove={() =>
+                patch(
+                  ["principles", "items"],
+                  principleItems.filter((_, j) => j !== i),
+                )
+              }
+            >
+              <TextInput
+                label="Title"
+                value={str(item.title)}
+                onChange={(v) => {
+                  const next = [...principleItems];
+                  next[i] = { ...item, title: v };
+                  patch(["principles", "items"], next);
+                }}
+              />
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Description"
+                  value={str(item.desc)}
+                  multiline
+                  onChange={(v) => {
+                    const next = [...principleItems];
+                    next[i] = { ...item, desc: v };
+                    patch(["principles", "items"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+
+        <Section title="Measured impact" description="Animated count-up numbers on the home page.">
+          <TextInput
+            label="Small label"
+            value={str(impact.eyebrow)}
+            onChange={(v) => patch(["impact", "eyebrow"], v)}
+          />
+          <TextInput
+            label="Title (first part)"
+            value={str(impact.title)}
+            onChange={(v) => patch(["impact", "title"], v)}
+          />
+          <TextInput
+            label="Highlighted title words"
+            value={str(impact.titleHighlight)}
+            onChange={(v) => patch(["impact", "titleHighlight"], v)}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Body"
+              value={str(impact.body)}
+              onChange={(v) => patch(["impact", "body"], v)}
+              multiline
+            />
+          </div>
+          <ListToolbar
+            title="Impact stats"
+            addLabel="Add stat"
+            onAdd={() =>
+              patch(["impact", "stats"], [...impactStats, { label: "New label", end: 0, suffix: "" }])
+            }
+          />
+          {impactStats.map((s, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Impact"
+              onRemove={() =>
+                patch(
+                  ["impact", "stats"],
+                  impactStats.filter((_, j) => j !== i),
+                )
+              }
+            >
+              <TextInput
+                label="Label"
+                value={str(s.label)}
+                onChange={(v) => {
+                  const next = [...impactStats];
+                  next[i] = { ...s, label: v };
+                  patch(["impact", "stats"], next);
+                }}
+              />
+              <TextInput
+                label="Number (count-up end)"
+                value={str(s.end)}
+                onChange={(v) => {
+                  const next = [...impactStats];
+                  next[i] = { ...s, end: Number(v.replace(/,/g, "")) || 0 };
+                  patch(["impact", "stats"], next);
+                }}
+                hint="Digits only, e.g. 48200"
+              />
+              <TextInput
+                label="Suffix"
+                value={str(s.suffix)}
+                onChange={(v) => {
+                  const next = [...impactStats];
+                  next[i] = { ...s, suffix: v };
+                  patch(["impact", "stats"], next);
+                }}
+                hint='e.g. "+" or "K"'
+              />
+            </ItemCard>
+          ))}
+        </Section>
+
+        <Section title="Eight ways we show up" description="Program cards on the home page.">
+          <TextInput
+            label="Small label"
+            value={str(eightWays.eyebrow)}
+            onChange={(v) => patch(["eightWays", "eyebrow"], v)}
+          />
+          <TextInput
+            label="Title (first part)"
+            value={str(eightWays.title)}
+            onChange={(v) => patch(["eightWays", "title"], v)}
+          />
+          <TextInput
+            label="Highlighted title words"
+            value={str(eightWays.titleHighlight)}
+            onChange={(v) => patch(["eightWays", "titleHighlight"], v)}
+          />
+          <ListToolbar
+            title="Programs"
+            addLabel="Add program"
+            onAdd={() => patch(["eightWays", "items"], [...eightItems, { title: "New program", desc: "" }])}
+          />
+          {eightItems.map((item, i) => (
+            <ItemCard
+              key={i}
+              index={i}
+              label="Program"
+              onRemove={() =>
+                patch(
+                  ["eightWays", "items"],
+                  eightItems.filter((_, j) => j !== i),
+                )
+              }
+            >
+              <TextInput
+                label="Title"
+                value={str(item.title)}
+                onChange={(v) => {
+                  const next = [...eightItems];
+                  next[i] = { ...item, title: v };
+                  patch(["eightWays", "items"], next);
+                }}
+              />
+              <div className="sm:col-span-2">
+                <TextInput
+                  label="Description"
+                  value={str(item.desc)}
+                  multiline
+                  onChange={(v) => {
+                    const next = [...eightItems];
+                    next[i] = { ...item, desc: v };
+                    patch(["eightWays", "items"], next);
+                  }}
+                />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+
         <Section title="About teaser">
           <TextInput label="Small label" value={str(about.eyebrow)} onChange={(v) => patch(["aboutTeaser", "eyebrow"], v)} />
           <TextInput label="Title" value={str(about.title)} onChange={(v) => patch(["aboutTeaser", "title"], v)} />
@@ -350,7 +640,7 @@ export function WebsiteSectionsForm({
         </Section>
         <Section
           title="Trusted partners"
-          description="Partner name and optional logo for the scrolling strip on the home page."
+          description="Upload each partner’s logo — logos appear in the scrolling strip on the home page."
         >
           <div className="sm:col-span-2">
             <TextInput
@@ -400,7 +690,7 @@ export function WebsiteSectionsForm({
                     next[i] = { ...item, name: v };
                     patch(["partners", "items"], next);
                   }}
-                  hint="Shown if no logo, or as alt text for the logo"
+                  hint="Shown under the logo on the home page"
                 />
               </div>
             </ItemCard>
@@ -415,13 +705,42 @@ export function WebsiteSectionsForm({
     const story = asObj(sections.story);
     const paragraphs = asArr<string>(story.paragraphs).map((p) => (typeof p === "string" ? p : ""));
     const values = asArr<{ title?: string; body?: string }>(sections.values);
+    const founder = asObj(sections.founder);
+    const ceo = asObj(sections.ceo);
+    const programs = asObj(sections.programs);
+    const programItems = asArr<{ title?: string; body?: string; stat?: string }>(programs.items);
+
+    const setMessage = (key: "founder" | "ceo", field: string, value: string) => {
+      const current = asObj(sections[key]);
+      patch([key], { ...current, [field]: value });
+    };
+
+    const moveProgram = (i: number, dir: -1 | 1) => {
+      const to = i + dir;
+      if (to < 0 || to >= programItems.length) return;
+      const next = [...programItems];
+      const tmp = next[i]!;
+      next[i] = next[to]!;
+      next[to] = tmp;
+      patch(["programs", "items"], next);
+    };
+
     return (
       <div className="space-y-5">
+        <div className="rounded-xl border border-brand-orange/25 bg-accent/40 px-4 py-3 text-sm text-foreground">
+          <p className="font-semibold">About page — full CMS</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Edit every block shown on the public About page: hero, story, values, founder message,
+            CEO message, and programs. Click <b>Save &amp; publish</b> when done.
+          </p>
+        </div>
+
         <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
-        <Section title="Our story">
+
+        <Section title="1 · Our story" description="Left column text + CTA on About.">
           <TextInput label="Section title" value={str(story.title)} onChange={(v) => patch(["story", "title"], v)} />
           <TextInput label="Button text" value={str(story.cta)} onChange={(v) => patch(["story", "cta"], v)} />
-          <TextInput label="Button link" value={str(story.ctaLink)} onChange={(v) => patch(["story", "ctaLink"], v)} />
+          <TextInput label="Button link" value={str(story.ctaLink)} onChange={(v) => patch(["story", "ctaLink"], v)} hint="e.g. /team" />
           <ListToolbar
             title="Story paragraphs"
             addLabel="Add paragraph"
@@ -449,7 +768,8 @@ export function WebsiteSectionsForm({
             </ItemCard>
           ))}
         </Section>
-        <Section title="Values / principles">
+
+        <Section title="2 · Values / principles" description="Small cards beside the story.">
           <ListToolbar
             title="Values"
             addLabel="Add value"
@@ -483,6 +803,187 @@ export function WebsiteSectionsForm({
             </ItemCard>
           ))}
         </Section>
+
+        <Section title="3 · Founder's message" description="Photo + quote block on About.">
+          <TextInput
+            label="Small label"
+            value={str(founder.eyebrow)}
+            onChange={(v) => setMessage("founder", "eyebrow", v)}
+            hint='e.g. Founder message'
+          />
+          <TextInput label="Name" value={str(founder.name)} onChange={(v) => setMessage("founder", "name", v)} />
+          <TextInput
+            label="Role / title"
+            value={str(founder.role)}
+            onChange={(v) => setMessage("founder", "role", v)}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Message"
+              value={str(founder.message)}
+              onChange={(v) => setMessage("founder", "message", v)}
+              multiline
+              className="min-h-[120px]"
+            />
+          </div>
+          <GalleryImageField
+            imageUrl={str(founder.imageUrl)}
+            onUploaded={(url) => setMessage("founder", "imageUrl", url)}
+            onClear={() => setMessage("founder", "imageUrl", "")}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Or paste image URL"
+              value={str(founder.imageUrl)}
+              onChange={(v) => setMessage("founder", "imageUrl", v)}
+            />
+          </div>
+        </Section>
+
+        <Section title="4 · CEO's message" description="Photo + quote block on About (image on the right).">
+          <TextInput
+            label="Small label"
+            value={str(ceo.eyebrow)}
+            onChange={(v) => setMessage("ceo", "eyebrow", v)}
+            hint='e.g. CEO message'
+          />
+          <TextInput label="Name" value={str(ceo.name)} onChange={(v) => setMessage("ceo", "name", v)} />
+          <TextInput label="Role / title" value={str(ceo.role)} onChange={(v) => setMessage("ceo", "role", v)} />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Message"
+              value={str(ceo.message)}
+              onChange={(v) => setMessage("ceo", "message", v)}
+              multiline
+              className="min-h-[120px]"
+            />
+          </div>
+          <GalleryImageField
+            imageUrl={str(ceo.imageUrl)}
+            onUploaded={(url) => setMessage("ceo", "imageUrl", url)}
+            onClear={() => setMessage("ceo", "imageUrl", "")}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Or paste image URL"
+              value={str(ceo.imageUrl)}
+              onChange={(v) => setMessage("ceo", "imageUrl", v)}
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="5 · Programs"
+          description="Program cards at the bottom of About (/programs redirects here)."
+        >
+          <TextInput
+            label="Section eyebrow"
+            value={str(programs.eyebrow)}
+            onChange={(v) => patch(["programs"], { ...programs, eyebrow: v })}
+          />
+          <TextInput
+            label="Section title"
+            value={str(programs.title)}
+            onChange={(v) => patch(["programs"], { ...programs, title: v })}
+          />
+          <TextInput
+            label="Highlighted words in title"
+            value={str(programs.titleHighlight)}
+            onChange={(v) => patch(["programs"], { ...programs, titleHighlight: v })}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Section description"
+              value={str(programs.description)}
+              onChange={(v) => patch(["programs"], { ...programs, description: v })}
+              multiline
+            />
+          </div>
+          <ListToolbar
+            title={`Program cards (${programItems.length})`}
+            addLabel="Add program"
+            onAdd={() =>
+              patch(["programs", "items"], [...programItems, { title: "", body: "", stat: "" }])
+            }
+          />
+          {programItems.length === 0 ? (
+            <p className="sm:col-span-2 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
+              No programs yet. Click “Add program” or save after loading defaults from the server.
+            </p>
+          ) : null}
+          {programItems.map((item, i) => (
+            <div key={i} className="sm:col-span-2 space-y-3 rounded-lg border border-border bg-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Program {i + 1}
+                  {item.title ? ` · ${item.title}` : ""}
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  <Button type="button" variant="outline" size="sm" disabled={i === 0} onClick={() => moveProgram(i, -1)}>
+                    Up
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={i === programItems.length - 1}
+                    onClick={() => moveProgram(i, 1)}
+                  >
+                    Down
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() =>
+                      patch(
+                        ["programs", "items"],
+                        programItems.filter((_, j) => j !== i),
+                      )
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove
+                  </Button>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextInput
+                  label="Title"
+                  value={str(item.title)}
+                  onChange={(v) => {
+                    const next = [...programItems];
+                    next[i] = { ...item, title: v };
+                    patch(["programs", "items"], next);
+                  }}
+                />
+                <TextInput
+                  label="Stat badge"
+                  value={str(item.stat)}
+                  onChange={(v) => {
+                    const next = [...programItems];
+                    next[i] = { ...item, stat: v };
+                    patch(["programs", "items"], next);
+                  }}
+                  hint='e.g. "210K packages"'
+                />
+                <div className="sm:col-span-2">
+                  <TextInput
+                    label="Description"
+                    value={str(item.body)}
+                    multiline
+                    onChange={(v) => {
+                      const next = [...programItems];
+                      next[i] = { ...item, body: v };
+                      patch(["programs", "items"], next);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </Section>
       </div>
     );
   }
@@ -512,97 +1013,238 @@ export function WebsiteSectionsForm({
 
   if (page === "leadership") {
     const hero = asObj(sections.hero);
-    const groups = asArr<{ title?: string; members?: { name?: string; role?: string; bio?: string }[] }>(
-      sections.groups,
-    );
+    type Person = {
+      name?: string;
+      role?: string;
+      phone?: string;
+      email?: string;
+      photoUrl?: string;
+      linkedin?: string;
+    };
+    const emptyPerson = (): Person => ({
+      name: "",
+      role: "",
+      phone: "",
+      email: "",
+      photoUrl: "",
+      linkedin: "",
+    });
+    const groups = asArr<{ title?: string; members?: Person[] }>(sections.groups);
+
+    const setGroups = (next: typeof groups) => patch(["groups"], next);
+
+    const setMember = (gi: number, mi: number, patchMember: Partial<Person>) => {
+      const g = groups[gi];
+      const next = [...groups];
+      const members = [...(g.members || [])];
+      members[mi] = { ...members[mi], ...patchMember };
+      next[gi] = { ...g, members };
+      setGroups(next);
+    };
+
+    const moveGroup = (gi: number, dir: -1 | 1) => {
+      const to = gi + dir;
+      if (to < 0 || to >= groups.length) return;
+      const next = [...groups];
+      const tmp = next[gi]!;
+      next[gi] = next[to]!;
+      next[to] = tmp;
+      setGroups(next);
+    };
+
+    const moveMember = (gi: number, mi: number, dir: -1 | 1) => {
+      const members = [...(groups[gi]?.members || [])];
+      const to = mi + dir;
+      if (to < 0 || to >= members.length) return;
+      const tmp = members[mi]!;
+      members[mi] = members[to]!;
+      members[to] = tmp;
+      const next = [...groups];
+      next[gi] = { ...groups[gi], members };
+      setGroups(next);
+    };
+
     return (
       <div className="space-y-5">
         <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
-        <Section title="Leadership groups" description="e.g. Board, Chapter Presidents, Executive Team.">
+
+        <Section
+          title="Team groups & people"
+          description="Matches the public Team page: photo, name, role, phone, email, and LinkedIn only."
+        >
           <ListToolbar
             title="Groups"
             addLabel="Add group"
-            onAdd={() =>
-              patch(["groups"], [...groups, { title: "New group", members: [{ name: "", role: "", bio: "" }] }])
-            }
+            onAdd={() => setGroups([...groups, { title: "New group", members: [emptyPerson()] }])}
           />
+          {groups.length === 0 ? (
+            <p className="sm:col-span-2 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
+              No groups yet. Click “Add group” to start building the Team page.
+            </p>
+          ) : null}
           {groups.map((g, gi) => (
-            <ItemCard
-              key={gi}
-              index={gi}
-              label="Group"
-              onRemove={() => patch(["groups"], groups.filter((_, j) => j !== gi))}
-            >
-              <div className="sm:col-span-2">
-                <TextInput
-                  label="Group title"
-                  value={str(g.title)}
-                  onChange={(v) => {
-                    const next = [...groups];
-                    next[gi] = { ...g, title: v };
-                    patch(["groups"], next);
-                  }}
-                />
+            <div key={gi} className="sm:col-span-2 space-y-3 rounded-lg border border-border bg-card p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Group {gi + 1}
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={gi === 0}
+                    onClick={() => moveGroup(gi, -1)}
+                  >
+                    Move up
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={gi === groups.length - 1}
+                    onClick={() => moveGroup(gi, 1)}
+                  >
+                    Move down
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setGroups(groups.filter((_, j) => j !== gi))}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Remove group
+                  </Button>
+                </div>
               </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <TextInput
+                    label="Group title"
+                    value={str(g.title)}
+                    onChange={(v) => {
+                      const next = [...groups];
+                      next[gi] = { ...g, title: v };
+                      setGroups(next);
+                    }}
+                    hint='e.g. "Executive Leadership Team" or "Board of Directors"'
+                  />
+                </div>
+              </div>
+
               <ListToolbar
-                title="People in this group"
+                title={`People (${(g.members || []).length})`}
                 addLabel="Add person"
                 onAdd={() => {
                   const next = [...groups];
-                  next[gi] = { ...g, members: [...(g.members || []), { name: "", role: "", bio: "" }] };
-                  patch(["groups"], next);
+                  next[gi] = { ...g, members: [...(g.members || []), emptyPerson()] };
+                  setGroups(next);
                 }}
               />
+
               {(g.members || []).map((m, mi) => (
-                <ItemCard
+                <div
                   key={mi}
-                  index={mi}
-                  label="Person"
-                  onRemove={() => {
-                    const next = [...groups];
-                    next[gi] = { ...g, members: (g.members || []).filter((_, j) => j !== mi) };
-                    patch(["groups"], next);
-                  }}
+                  className="space-y-4 rounded-lg border border-border/80 bg-background/80 p-4"
                 >
-                  <TextInput
-                    label="Name"
-                    value={str(m.name)}
-                    onChange={(v) => {
-                      const next = [...groups];
-                      const members = [...(g.members || [])];
-                      members[mi] = { ...m, name: v };
-                      next[gi] = { ...g, members };
-                      patch(["groups"], next);
-                    }}
-                  />
-                  <TextInput
-                    label="Role / title"
-                    value={str(m.role)}
-                    onChange={(v) => {
-                      const next = [...groups];
-                      const members = [...(g.members || [])];
-                      members[mi] = { ...m, role: v };
-                      next[gi] = { ...g, members };
-                      patch(["groups"], next);
-                    }}
-                  />
-                  <div className="sm:col-span-2">
-                    <TextInput
-                      label="Short bio (optional)"
-                      value={str(m.bio)}
-                      onChange={(v) => {
-                        const next = [...groups];
-                        const members = [...(g.members || [])];
-                        members[mi] = { ...m, bio: v };
-                        next[gi] = { ...g, members };
-                        patch(["groups"], next);
-                      }}
-                      multiline
-                    />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Person {mi + 1}
+                      {m.name ? ` · ${m.name}` : ""}
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={mi === 0}
+                        onClick={() => moveMember(gi, mi, -1)}
+                      >
+                        Up
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={mi === (g.members || []).length - 1}
+                        onClick={() => moveMember(gi, mi, 1)}
+                      >
+                        Down
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => {
+                          const next = [...groups];
+                          next[gi] = {
+                            ...g,
+                            members: (g.members || []).filter((_, j) => j !== mi),
+                          };
+                          setGroups(next);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Remove
+                      </Button>
+                    </div>
                   </div>
-                </ItemCard>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <TextInput
+                      label="Full name"
+                      value={str(m.name)}
+                      onChange={(v) => setMember(gi, mi, { name: v })}
+                    />
+                    <TextInput
+                      label="Role / title"
+                      value={str(m.role)}
+                      onChange={(v) => setMember(gi, mi, { role: v })}
+                      hint="Orange tag under the name on the website"
+                    />
+
+                    <GalleryImageField
+                      imageUrl={str(m.photoUrl)}
+                      onUploaded={(url) => setMember(gi, mi, { photoUrl: url })}
+                      onClear={() => setMember(gi, mi, { photoUrl: "" })}
+                    />
+                    <div className="sm:col-span-2">
+                      <TextInput
+                        label="Or paste photo URL"
+                        value={str(m.photoUrl)}
+                        onChange={(v) => setMember(gi, mi, { photoUrl: v })}
+                        hint="Optional if you uploaded a photo above"
+                      />
+                    </div>
+
+                    <TextInput
+                      label="Phone"
+                      value={str(m.phone)}
+                      onChange={(v) => setMember(gi, mi, { phone: v })}
+                      hint="Shown as a phone icon only on the website"
+                    />
+                    <TextInput
+                      label="Email"
+                      value={str(m.email)}
+                      onChange={(v) => setMember(gi, mi, { email: v })}
+                      hint="Shown as an email icon only on the website"
+                    />
+                    <div className="sm:col-span-2">
+                      <TextInput
+                        label="LinkedIn link"
+                        value={str(m.linkedin)}
+                        onChange={(v) => setMember(gi, mi, { linkedin: v })}
+                        hint="Full URL — shown as a LinkedIn icon on the website"
+                      />
+                    </div>
+                  </div>
+                </div>
               ))}
-            </ItemCard>
+            </div>
           ))}
         </Section>
       </div>
@@ -611,79 +1253,16 @@ export function WebsiteSectionsForm({
 
   if (page === "chapters") {
     const hero = asObj(sections.hero);
-    const items = asArr<{
-      city?: string;
-      president?: string;
-      members?: number | string;
-      projects?: number | string;
-      donations?: string;
-    }>(sections.items);
     return (
       <div className="space-y-5">
+        <div className="rounded-xl border border-brand-orange/25 bg-accent/40 px-4 py-3 text-sm">
+          <p className="font-semibold">Chapters page</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Edit the page header here. Chapter cards on the public site load live from the{" "}
+            <b>Chapters</b> module in the CEO dashboard (active chapters only) — not from a dummy list.
+          </p>
+        </div>
         <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
-        <Section title="Chapter list">
-          <ListToolbar
-            title="Chapters"
-            addLabel="Add chapter"
-            onAdd={() =>
-              patch(["items"], [...items, { city: "", president: "", members: 0, projects: 0, donations: "" }])
-            }
-          />
-          {items.map((item, i) => (
-            <ItemCard
-              key={i}
-              index={i}
-              label="Chapter"
-              onRemove={() => patch(["items"], items.filter((_, j) => j !== i))}
-            >
-              <TextInput
-                label="City"
-                value={str(item.city)}
-                onChange={(v) => {
-                  const next = [...items];
-                  next[i] = { ...item, city: v };
-                  patch(["items"], next);
-                }}
-              />
-              <TextInput
-                label="President"
-                value={str(item.president)}
-                onChange={(v) => {
-                  const next = [...items];
-                  next[i] = { ...item, president: v };
-                  patch(["items"], next);
-                }}
-              />
-              <TextInput
-                label="Members"
-                value={str(item.members)}
-                onChange={(v) => {
-                  const next = [...items];
-                  next[i] = { ...item, members: Number(v) || 0 };
-                  patch(["items"], next);
-                }}
-              />
-              <TextInput
-                label="Projects"
-                value={str(item.projects)}
-                onChange={(v) => {
-                  const next = [...items];
-                  next[i] = { ...item, projects: Number(v) || 0 };
-                  patch(["items"], next);
-                }}
-              />
-              <TextInput
-                label="Donations raised"
-                value={str(item.donations)}
-                onChange={(v) => {
-                  const next = [...items];
-                  next[i] = { ...item, donations: v };
-                  patch(["items"], next);
-                }}
-              />
-            </ItemCard>
-          ))}
-        </Section>
       </div>
     );
   }

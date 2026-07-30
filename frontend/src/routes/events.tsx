@@ -30,7 +30,7 @@ export default function Page() {
           title={highlightTitle(hero.title || "Show up. Change lives.", hero.titleHighlight)}
           description={hero.description}
         />
-        <section className="container-page pb-24 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="page-section grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((e, i) => (
             <Reveal key={e.title} delay={i}>
               <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated">

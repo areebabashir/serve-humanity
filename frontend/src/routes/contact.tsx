@@ -32,7 +32,7 @@ export default function Page() {
           title={highlightTitle(hero.title || "Let's talk", hero.titleHighlight)}
           description={hero.description}
         />
-        <section className="container-page pb-24 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        <section className="page-section grid gap-6 lg:grid-cols-[1fr_1.2fr]">
           <Reveal>
             <div className="space-y-4">
               {details.map((c, i) => {

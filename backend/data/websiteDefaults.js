@@ -35,15 +35,68 @@ export const DEFAULT_WEBSITE_CONTENT = {
     },
     partners: {
       title: "Trusted by partners around the world",
+      items: [],
+    },
+    story: {
+      eyebrow: "Our story",
+      title: "A decade of turning",
+      titleHighlight: "compassion into action",
+      body: "Serve Humanity began as a small circle of friends who couldn't sit still while their neighbours went hungry. Today we're an organized humanitarian movement — but the heart remains unchanged: humans, showing up for humans.",
+      points: [
+        "Founded in 2014 with a single food drive — now a movement of thousands.",
+        "Independently audited. 92¢ of every rupee reaches beneficiaries directly.",
+        "Present in 36 cities with local chapters led by trusted community leaders.",
+      ],
+      cta: "Read our full story",
+      ctaLink: "/about",
+      quote: "You can't help everyone, but everyone can help someone.",
+      quoteAttr: "— Our founding principle",
+      estLabel: "Est. 2014",
+      sideStats: [
+        { value: "10+", label: "Years" },
+        { value: "36", label: "Chapters" },
+        { value: "48K", label: "Lives" },
+      ],
+    },
+    principles: {
+      eyebrow: "Core values",
+      title: "The principles that",
+      titleHighlight: "guide every act",
+      subtitle: "Six commitments we make to every community, every donor, every volunteer.",
       items: [
-        { name: "UNICEF", logoUrl: "" },
-        { name: "Red Crescent", logoUrl: "" },
-        { name: "WHO Partners", logoUrl: "" },
-        { name: "UNHCR", logoUrl: "" },
-        { name: "Save the Children", logoUrl: "" },
-        { name: "OXFAM", logoUrl: "" },
-        { name: "Care Intl.", logoUrl: "" },
-        { name: "Islamic Relief", logoUrl: "" },
+        { title: "Compassion", desc: "We listen first. Every person we serve is met with dignity, not pity." },
+        { title: "Trust", desc: "Every rupee is tracked. Every family receipt is verified." },
+        { title: "Transparency", desc: "Public reports. Open books. Audited yearly, without exception." },
+        { title: "Integrity", desc: "We keep promises. Our word is our foundation." },
+        { title: "Empowerment", desc: "We teach skills, not just deliver aid. Sustainable change matters." },
+        { title: "Unity", desc: "Faiths, backgrounds, borders — humanity is one family." },
+      ],
+    },
+    impact: {
+      eyebrow: "Measured impact",
+      title: "Numbers that represent",
+      titleHighlight: "real people",
+      body: "Every count is a family fed, a child in school, a neighbour who felt seen.",
+      stats: [
+        { label: "Families Helped", end: 48200, suffix: "+" },
+        { label: "Active Volunteers", end: 12500, suffix: "" },
+        { label: "City Chapters", end: 36, suffix: "" },
+        { label: "Food Packages", end: 210, suffix: "K" },
+      ],
+    },
+    eightWays: {
+      eyebrow: "Programs",
+      title: "Eight ways we show up",
+      titleHighlight: "every single day",
+      items: [
+        { title: "Food Security", desc: "Weekly rations, hot meals & Ramadan drives." },
+        { title: "Education", desc: "Scholarships & school supplies for 8,400 children." },
+        { title: "Healthcare", desc: "Free clinics, medicines & maternal care." },
+        { title: "Emergency Relief", desc: "Floods, quakes, displacement — rapid response." },
+        { title: "Orphan Care", desc: "Sponsorship & family support programs." },
+        { title: "Women Empowerment", desc: "Skills training & micro-grants for women." },
+        { title: "Clean Water", desc: "Wells, filters & rural infrastructure." },
+        { title: "Skills Development", desc: "Free vocational training & job placement." },
       ],
     },
   },
@@ -62,8 +115,8 @@ export const DEFAULT_WEBSITE_CONTENT = {
         "What began with a handful of friends distributing meals in one neighbourhood has become a coordinated humanitarian effort across 36 cities. Along the way, our principles haven't changed: dignity for every person, transparency in every rupee, and community-led action in every chapter.",
         "We measure success not in dollars raised but in lives sustainably changed — children back in school, families back on their feet, women earning their first income, elders no longer forgotten.",
       ],
-      cta: "Meet our leadership",
-      ctaLink: "/leadership",
+      cta: "Meet our team",
+      ctaLink: "/team",
     },
     values: [
       { title: "Compassion", body: "48K+ families" },
@@ -73,6 +126,39 @@ export const DEFAULT_WEBSITE_CONTENT = {
       { title: "Empowerment", body: "8K+ students" },
       { title: "Unity", body: "36 chapters" },
     ],
+    founder: {
+      eyebrow: "Founder's message",
+      name: "Muhammad Zeeshan",
+      role: "Founder",
+      message:
+        "Serve Humanity began with a simple belief — that no neighbour should go hungry while we have the means to help. That belief still guides every meal we serve and every hand we hold.",
+      imageUrl: "",
+    },
+    ceo: {
+      eyebrow: "CEO's message",
+      name: "Muhammad Zeeshan",
+      role: "Founder & CEO",
+      message:
+        "Transparency, dignity and local leadership are not slogans for us — they are how we work. Together with our chapters, we turn compassion into lasting change.",
+      imageUrl: "",
+    },
+    programs: {
+      eyebrow: "Programs",
+      title: "Every program tells a story",
+      titleHighlight: "tells a story",
+      description:
+        "Eight coordinated programs designed to address the root causes of hardship — not just the symptoms.",
+      items: [
+        { title: "Food Security", body: "Weekly rations, hot meals, Ramadan drives and food banks in every chapter city.", stat: "210K packages" },
+        { title: "Education", body: "Scholarships, uniforms, books and mentoring for children who'd otherwise drop out.", stat: "8,400 students" },
+        { title: "Healthcare", body: "Free clinics, medicines, maternal care and specialist camps in underserved areas.", stat: "62 clinics" },
+        { title: "Emergency Relief", body: "Rapid response for floods, earthquakes and displacement crises within 48 hours.", stat: "12 crises served" },
+        { title: "Orphan Care", body: "Sponsorship programs providing food, education and dignity to orphaned children.", stat: "1,240 children" },
+        { title: "Women Empowerment", body: "Skills training, micro-grants and safe spaces for women to build livelihoods.", stat: "2,800 women" },
+        { title: "Clean Water", body: "Wells, filtration systems and rural water infrastructure that lasts decades.", stat: "148 wells" },
+        { title: "Skills Development", body: "Vocational training in tailoring, IT, culinary arts and trades with job placement.", stat: "4,600 graduates" },
+      ],
+    },
   },
 
   mission: {
@@ -95,45 +181,14 @@ export const DEFAULT_WEBSITE_CONTENT = {
 
   leadership: {
     hero: {
-      eyebrow: "Leadership",
-      title: "The people behind the mission",
-      titleHighlight: "behind the mission",
+      eyebrow: "Team",
+      title: "Team",
+      titleHighlight: "",
       description:
         "A dedicated team of volunteers, board members and chapter leaders — united by one purpose.",
     },
-    groups: [
-      {
-        title: "Founder & CEO",
-        members: [{ name: "Muhammad Zeeshan", role: "Founder & CEO", bio: "Leading Serve Humanity since 2014." }],
-      },
-      {
-        title: "Board of Directors",
-        members: [
-          { name: "Dr. Ayesha Malik", role: "Board Chair" },
-          { name: "Kamran Siddiqui", role: "Treasurer" },
-          { name: "Rukhsana Ahmed", role: "Board Member" },
-          { name: "Junaid Iqbal", role: "Board Member" },
-        ],
-      },
-      {
-        title: "Chapter Presidents",
-        members: [
-          { name: "Ahmed Raza", role: "President — Karachi" },
-          { name: "Sana Iqbal", role: "President — Lahore" },
-          { name: "Bilal Khan", role: "President — Islamabad" },
-          { name: "Omar Sheikh", role: "President — London" },
-        ],
-      },
-      {
-        title: "Executive Team",
-        members: [
-          { name: "Zara Ahmad", role: "Programs Director" },
-          { name: "Faisal Nazir", role: "Operations Lead" },
-          { name: "Hina Malik", role: "Communications" },
-          { name: "Bilal Rehman", role: "Finance Head" },
-        ],
-      },
-    ],
+    // No dummy roster — Team page is filled only from CMS / DB
+    groups: [],
   },
 
   chapters: {
@@ -142,18 +197,10 @@ export const DEFAULT_WEBSITE_CONTENT = {
       title: "Local roots, global reach",
       titleHighlight: "global reach",
       description:
-        "36 chapters, one mission. Each chapter is led by a local president and driven by community volunteers.",
+        "Local chapters delivering humanitarian work — each led by a president and driven by community volunteers.",
     },
-    items: [
-      { city: "Karachi", president: "Ahmed Raza", members: 820, projects: 42, donations: "Rs. 18M" },
-      { city: "Lahore", president: "Sana Iqbal", members: 640, projects: 38, donations: "Rs. 14M" },
-      { city: "Islamabad", president: "Bilal Khan", members: 410, projects: 27, donations: "Rs. 9M" },
-      { city: "Peshawar", president: "Zara Ahmad", members: 220, projects: 18, donations: "Rs. 5M" },
-      { city: "Quetta", president: "Faisal Nazir", members: 190, projects: 14, donations: "Rs. 4M" },
-      { city: "Dubai", president: "Hina Malik", members: 150, projects: 12, donations: "Rs. 6M" },
-      { city: "London", president: "Omar Sheikh", members: 320, projects: 22, donations: "Rs. 11M" },
-      { city: "New York", president: "Ayesha Noor", members: 280, projects: 19, donations: "Rs. 9M" },
-    ],
+    // Chapter cards come from the Chapters collection — not CMS dummy list
+    items: [],
   },
 
   programs: {

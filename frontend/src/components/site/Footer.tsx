@@ -9,7 +9,7 @@ const cols = [
     links: [
       { label: "About Us", to: "/about" },
       { label: "Mission & Vision", to: "/mission" },
-      { label: "Leadership", to: "/leadership" },
+      { label: "Team", to: "/team" },
       { label: "City Chapters", to: "/chapters" },
     ],
   },
@@ -25,7 +25,7 @@ const cols = [
   {
     title: "Support",
     links: [
-      { label: "Programs", to: "/programs" },
+      { label: "Programs", to: "/about#programs" },
       { label: "FAQ", to: "/faq" },
       { label: "Contact", to: "/contact" },
       { label: "Login", to: "/login" },

@@ -44,7 +44,7 @@ export default function Page() {
           title={highlightTitle(hero.title || "Why we exist", hero.titleHighlight)}
           description={hero.description}
         />
-        <section className="container-page pb-24 grid gap-6 md:grid-cols-2">
+        <section className="page-section grid gap-6 md:grid-cols-2">
           {cards.map((c, i) => (
             <Reveal key={c.title} delay={i} className={`relative overflow-hidden rounded-3xl p-8 md:p-10 ${c.cls}`}>
               <div className="absolute inset-0 bg-mesh opacity-30" />
