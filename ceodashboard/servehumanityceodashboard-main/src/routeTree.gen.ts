@@ -17,6 +17,7 @@ import { Route as DashboardChaptersRouteImport } from './routes/_dashboard.chapt
 import { Route as DashboardDocumentationRouteImport } from './routes/_dashboard.documentation'
 import { Route as DashboardFinanceRouteImport } from './routes/_dashboard.finance'
 import { Route as DashboardMediaRouteImport } from './routes/_dashboard.media'
+import { Route as DashboardNotificationsRouteImport } from './routes/_dashboard.notifications'
 import { Route as DashboardOperationsRouteImport } from './routes/_dashboard.operations'
 import { Route as DashboardReportsRouteImport } from './routes/_dashboard.reports'
 import { Route as DashboardRolesRouteImport } from './routes/_dashboard.roles'
@@ -79,6 +80,11 @@ const DashboardFinanceRoute = DashboardFinanceRouteImport.update({
 const DashboardMediaRoute = DashboardMediaRouteImport.update({
   id: '/media',
   path: '/media',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardNotificationsRoute = DashboardNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardOperationsRoute = DashboardOperationsRouteImport.update({
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/documentation': typeof DashboardDocumentationRouteWithChildren
   '/finance': typeof DashboardFinanceRouteWithChildren
   '/media': typeof DashboardMediaRouteWithChildren
+  '/notifications': typeof DashboardNotificationsRoute
   '/operations': typeof DashboardOperationsRoute
   '/reports': typeof DashboardReportsRoute
   '/roles': typeof DashboardRolesRoute
@@ -253,6 +260,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/board': typeof DashboardBoardRoute
   '/chapters': typeof DashboardChaptersRoute
+  '/notifications': typeof DashboardNotificationsRoute
   '/operations': typeof DashboardOperationsRoute
   '/reports': typeof DashboardReportsRoute
   '/roles': typeof DashboardRolesRoute
@@ -288,6 +296,7 @@ export interface FileRoutesById {
   '/_dashboard/documentation': typeof DashboardDocumentationRouteWithChildren
   '/_dashboard/finance': typeof DashboardFinanceRouteWithChildren
   '/_dashboard/media': typeof DashboardMediaRouteWithChildren
+  '/_dashboard/notifications': typeof DashboardNotificationsRoute
   '/_dashboard/operations': typeof DashboardOperationsRoute
   '/_dashboard/reports': typeof DashboardReportsRoute
   '/_dashboard/roles': typeof DashboardRolesRoute
@@ -324,6 +333,7 @@ export interface FileRouteTypes {
     | '/documentation'
     | '/finance'
     | '/media'
+    | '/notifications'
     | '/operations'
     | '/reports'
     | '/roles'
@@ -353,6 +363,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/board'
     | '/chapters'
+    | '/notifications'
     | '/operations'
     | '/reports'
     | '/roles'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/_dashboard/documentation'
     | '/_dashboard/finance'
     | '/_dashboard/media'
+    | '/_dashboard/notifications'
     | '/_dashboard/operations'
     | '/_dashboard/reports'
     | '/_dashboard/roles'
@@ -475,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/media'
       fullPath: '/media'
       preLoaderRoute: typeof DashboardMediaRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/notifications': {
+      id: '/_dashboard/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof DashboardNotificationsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/operations': {
@@ -725,6 +744,7 @@ interface DashboardRouteChildren {
   DashboardDocumentationRoute: typeof DashboardDocumentationRouteWithChildren
   DashboardFinanceRoute: typeof DashboardFinanceRouteWithChildren
   DashboardMediaRoute: typeof DashboardMediaRouteWithChildren
+  DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardOperationsRoute: typeof DashboardOperationsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
@@ -740,6 +760,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardDocumentationRoute: DashboardDocumentationRouteWithChildren,
   DashboardFinanceRoute: DashboardFinanceRouteWithChildren,
   DashboardMediaRoute: DashboardMediaRouteWithChildren,
+  DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardOperationsRoute: DashboardOperationsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardRolesRoute: DashboardRolesRoute,

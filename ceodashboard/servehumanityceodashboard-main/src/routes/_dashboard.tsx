@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useRouterState, Link, useNavigate } from "@tanstack/react-router";
 import { Bell, Search, ChevronRight, Loader2 } from "lucide-react";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
@@ -23,6 +23,11 @@ import {
   ROLE_HOME,
   type OrgRole,
 } from "@/lib/roles";
+import {
+  fetchInbox,
+  fetchUnreadCount,
+  type InboxNotification,
+} from "@/lib/notifications";
 
 export const Route = createFileRoute("/_dashboard")({
   component: DashboardLayout,
@@ -49,6 +54,7 @@ const routeLabels: Record<string, string> = {
   finance: "Finance",
   board: "Board & Governance",
   reports: "Reports & Analytics",
+  notifications: "Notifications",
   settings: "Settings",
 };
 
@@ -77,10 +83,33 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
+function relativeTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function DashboardLayout() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const [bellItems, setBellItems] = useState<InboxNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const refreshBell = useCallback(async () => {
+    try {
+      const [items, count] = await Promise.all([fetchInbox(), fetchUnreadCount()]);
+      setBellItems(items.slice(0, 5));
+      setUnreadCount(count);
+    } catch {
+      // Keep last known state if API fails (e.g. offline)
+    }
+  }, []);
 
   useEffect(() => {
     if (loading) return;
@@ -94,6 +123,13 @@ function DashboardLayout() {
       void navigate({ to: ROLE_HOME[role] });
     }
   }, [user, loading, navigate, pathname]);
+
+  useEffect(() => {
+    if (!user || !isCeoDashboardRole(user.systemRole)) return;
+    void refreshBell();
+    const id = window.setInterval(() => void refreshBell(), 60_000);
+    return () => window.clearInterval(id);
+  }, [user, refreshBell]);
 
   if (loading || !user || !isCeoDashboardRole(user.systemRole)) {
     return (
@@ -127,27 +163,48 @@ function DashboardLayout() {
               />
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <DropdownMenu>
+              <DropdownMenu onOpenChange={(open) => { if (open) void refreshBell(); }}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5" />
-                    <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />
+                    {unreadCount > 0 && (
+                      <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-80">
-                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                  <DropdownMenuLabel className="flex items-center justify-between">
+                    <span>Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {unreadCount} unread
+                      </span>
+                    )}
+                  </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="flex-col items-start gap-0.5">
-                    <span className="text-sm">12 cases pending &gt; 7 days</span>
-                    <span className="text-xs text-muted-foreground">Verification • just now</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex-col items-start gap-0.5">
-                    <span className="text-sm">Large expense awaiting approval</span>
-                    <span className="text-xs text-muted-foreground">Finance • 30m ago</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="flex-col items-start gap-0.5">
-                    <span className="text-sm">New chapter proposal: Hyderabad</span>
-                    <span className="text-xs text-muted-foreground">Board • 5h ago</span>
+                  {bellItems.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      No notifications yet
+                    </div>
+                  ) : (
+                    bellItems.map((n) => (
+                      <DropdownMenuItem key={n._id} asChild className="flex-col items-start gap-0.5">
+                        <Link to="/notifications">
+                          <span className={`text-sm ${n.readAt ? "text-muted-foreground" : "font-medium"}`}>
+                            {n.title}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {n.createdBy?.name ?? "Leadership"} · {relativeTime(n.createdAt)}
+                          </span>
+                        </Link>
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/notifications" className="justify-center text-sm font-medium">
+                      View all
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -168,6 +225,11 @@ function DashboardLayout() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  {canAccessModule(role, "notifications") && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/notifications">Notifications</Link>
+                    </DropdownMenuItem>
+                  )}
                   {canAccessModule(role, "settings") && (
                     <DropdownMenuItem asChild>
                       <Link to="/settings">Settings</Link>

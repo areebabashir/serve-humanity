@@ -37,11 +37,11 @@ export function isCeoDashboardRole(role: string | undefined | null): role is Org
 /** Modules a role can open. CEO gets everything. */
 export const ROLE_MODULES: Record<OrgRole, string[]> = {
   ceo: ["*"],
-  bog_verification: ["overview", "ops", "board"],
-  bog_operations: ["overview", "ops", "board"],
-  bog_media: ["overview", "media", "website", "board"],
-  bog_finance: ["overview", "finance", "board"],
-  bog_documentation: ["overview", "documentation", "board"],
+  bog_verification: ["overview", "ops", "board", "notifications"],
+  bog_operations: ["overview", "ops", "board", "notifications"],
+  bog_media: ["overview", "media", "website", "board", "notifications"],
+  bog_finance: ["overview", "finance", "board", "notifications"],
+  bog_documentation: ["overview", "documentation", "board", "notifications"],
 };
 
 export function canAccessModule(role: OrgRole, module: string): boolean {

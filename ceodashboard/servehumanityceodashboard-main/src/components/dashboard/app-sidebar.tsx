@@ -13,6 +13,7 @@ import {
   Landmark,
   BarChart3,
   Settings,
+  Bell,
   HeartHandshake,
   ChevronDown,
   FolderOpen,
@@ -83,6 +84,7 @@ const items = [
   { title: "Finance", url: "/finance", module: "finance", icon: Wallet, hasFinanceSub: true },
   { title: "Board & Governance", url: "/board", module: "board", icon: Landmark },
   { title: "Reports & Analytics", url: "/reports", module: "reports", icon: BarChart3 },
+  { title: "Notifications", url: "/notifications", module: "notifications", icon: Bell },
   { title: "Settings", url: "/settings", module: "settings", icon: Settings },
 ];
 

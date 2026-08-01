@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader, PageShell } from "@/components/dashboard/page-shell";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -50,12 +50,23 @@ function SettingsPage() {
         </TabsContent>
         <TabsContent value="broadcast" className="mt-4">
           <div className="rounded-xl border border-border bg-card p-5 shadow-[var(--shadow-card)] max-w-2xl space-y-3">
-            <div className="grid gap-1.5"><Label>Announcement</Label><Textarea placeholder="Message shown as a banner across every chapter dashboard…" rows={4} /></div>
+            <p className="text-sm text-muted-foreground">
+              Use the{" "}
+              <Link to="/notifications" className="font-medium text-foreground underline underline-offset-2">
+                Notifications
+              </Link>{" "}
+              page to compose and email broadcasts to BOGs, presidents, or all members.
+            </p>
+            <div className="grid gap-1.5"><Label>Announcement</Label><Textarea placeholder="Legacy stub — prefer Notifications page" rows={4} disabled /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1.5"><Label>Priority</Label><Input defaultValue="Normal" /></div>
-              <div className="grid gap-1.5"><Label>Expires on</Label><Input type="date" /></div>
+              <div className="grid gap-1.5"><Label>Priority</Label><Input defaultValue="Normal" disabled /></div>
+              <div className="grid gap-1.5"><Label>Expires on</Label><Input type="date" disabled /></div>
             </div>
-            <div className="flex justify-end"><Button style={{ background: "var(--gradient-brand)" }} className="text-white border-0" onClick={() => toast.success("Announcement broadcast")}>Broadcast to all chapters</Button></div>
+            <div className="flex justify-end">
+              <Button asChild style={{ background: "var(--gradient-brand)" }} className="text-white border-0">
+                <Link to="/notifications">Go to Notifications</Link>
+              </Button>
+            </div>
           </div>
         </TabsContent>
         <TabsContent value="integrations" className="mt-4">
