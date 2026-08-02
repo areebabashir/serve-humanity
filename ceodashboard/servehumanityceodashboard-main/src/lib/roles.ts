@@ -6,6 +6,9 @@
 
 export type OrgRole =
   | "ceo"
+  | "founder"
+  | "cto"
+  | "coo"
   | "bog_verification"
   | "bog_operations"
   | "bog_media"
@@ -14,6 +17,9 @@ export type OrgRole =
 
 export const ORG_ROLE_LABEL: Record<OrgRole, string> = {
   ceo: "Chief Executive",
+  founder: "Founder",
+  cto: "Chief Technology Officer",
+  coo: "Chief Operating Officer",
   bog_verification: "BOG — Verification",
   bog_operations: "BOG — Operations",
   bog_media: "BOG — Media & Website",
@@ -21,8 +27,14 @@ export const ORG_ROLE_LABEL: Record<OrgRole, string> = {
   bog_documentation: "BOG — Documentation",
 };
 
+/** Complete access to every module and admin action */
+export const FULL_ACCESS_ROLES: OrgRole[] = ["ceo", "founder", "cto", "coo"];
+
 export const CEO_DASHBOARD_ROLES: OrgRole[] = [
   "ceo",
+  "founder",
+  "cto",
+  "coo",
   "bog_verification",
   "bog_operations",
   "bog_media",
@@ -34,9 +46,16 @@ export function isCeoDashboardRole(role: string | undefined | null): role is Org
   return !!role && (CEO_DASHBOARD_ROLES as string[]).includes(role);
 }
 
-/** Modules a role can open. CEO gets everything. */
+export function isFullAccessRole(role: string | undefined | null): boolean {
+  return !!role && (FULL_ACCESS_ROLES as string[]).includes(role);
+}
+
+/** Modules a role can open. Full-access roles get everything. */
 export const ROLE_MODULES: Record<OrgRole, string[]> = {
   ceo: ["*"],
+  founder: ["*"],
+  cto: ["*"],
+  coo: ["*"],
   bog_verification: ["overview", "ops", "board", "notifications"],
   bog_operations: ["overview", "ops", "board", "notifications"],
   bog_media: ["overview", "media", "website", "board", "notifications"],
@@ -52,6 +71,9 @@ export function canAccessModule(role: OrgRole, module: string): boolean {
 /** Default home path after login for each role */
 export const ROLE_HOME: Record<OrgRole, string> = {
   ceo: "/",
+  founder: "/",
+  cto: "/",
+  coo: "/",
   bog_verification: "/verification",
   bog_operations: "/operations",
   bog_media: "/website",

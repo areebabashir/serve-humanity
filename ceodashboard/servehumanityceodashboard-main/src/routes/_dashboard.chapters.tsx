@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { api, ApiRequestError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { isFullAccessRole } from "@/lib/roles";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_dashboard/chapters")({
@@ -181,7 +182,7 @@ const emptyForm = {
 
 function ChaptersPage() {
   const { user } = useAuth();
-  const isCeo = user?.systemRole === "ceo";
+  const isCeo = isFullAccessRole(user?.systemRole);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<ChapterRow[]>([]);
   const [loading, setLoading] = useState(true);

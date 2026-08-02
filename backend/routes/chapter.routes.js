@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { protect, requireRole, requireCeoDashboard } from "../middleware/auth.js";
+import { protect, requireFullAccess, requireFullAccessOr, requireCeoDashboard } from "../middleware/auth.js";
 import {
   getAllChapters,
   getPublicChapters,
@@ -21,9 +21,9 @@ router.get("/:id/heads", getChapterHeads);
 router.get("/:id/details", protect, requireCeoDashboard, getChapterDetails);
 router.get("/:id/stats", protect, getChapterStats);
 router.get("/:id", getChapter);
-router.post("/", protect, requireRole("ceo"), createChapter);
-router.patch("/:id/president", protect, requireRole("ceo"), assignChapterPresident);
-router.patch("/:id", protect, requireRole("ceo", "president"), updateChapter);
-router.delete("/:id", protect, requireRole("ceo"), deleteChapter);
+router.post("/", protect, requireFullAccess, createChapter);
+router.patch("/:id/president", protect, requireFullAccess, assignChapterPresident);
+router.patch("/:id", protect, requireFullAccessOr("president"), updateChapter);
+router.delete("/:id", protect, requireFullAccess, deleteChapter);
 
 export default router;

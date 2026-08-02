@@ -51,6 +51,7 @@ import { useAuth } from "@/lib/auth";
 import {
   canAccessModule,
   ORG_ROLE_LABEL,
+  isFullAccessRole,
   type OrgRole,
 } from "@/lib/roles";
 import { DOC_NAV, type DocNavItem } from "@/lib/documentation";
@@ -150,8 +151,8 @@ export function AppSidebar() {
   const [opsOpen, setOpsOpen] = useState(opsOpenDefault);
 
   /** CEO keeps Documentation/Finance as dropdowns; BOG sees each page separately */
-  const docsAsDropdown = role === "ceo";
-  const financeAsDropdown = role === "ceo";
+  const docsAsDropdown = isFullAccessRole(role);
+  const financeAsDropdown = isFullAccessRole(role);
 
   const isActive = (url: string) =>
     url === "/" ? pathname === "/" : pathname === url || pathname.startsWith(url + "/");

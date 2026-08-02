@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
-import User, { CEO_DASHBOARD_ROLES } from "../models/User.js";
+import User, { CEO_DASHBOARD_ROLES, FULL_ACCESS_ROLES, isFullAccessRole } from "../models/User.js";
+
+export { FULL_ACCESS_ROLES, isFullAccessRole };
 
 export async function protect(req, res, next) {
   try {
@@ -40,6 +42,19 @@ export function requireRole(...roles) {
     }
     next();
   };
+}
+
+/** CEO / Founder / CTO / COO — full org admin */
+export function requireFullAccess(req, res, next) {
+  if (!req.user || !isFullAccessRole(req.user.systemRole)) {
+    return res.status(403).json({ success: false, message: "Leadership access only." });
+  }
+  next();
+}
+
+/** Full-access roles plus any extra system roles */
+export function requireFullAccessOr(...extraSystemRoles) {
+  return requireRole(...FULL_ACCESS_ROLES, ...extraSystemRoles.flat());
 }
 
 /** Allow if systemRole OR chapterRole matches (chapter ops roles live on chapterRole). */

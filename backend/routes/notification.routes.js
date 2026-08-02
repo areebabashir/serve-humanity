@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { protect, requireRole, requireCeoDashboard } from "../middleware/auth.js";
+import { protect, requireFullAccess, requireCeoDashboard } from "../middleware/auth.js";
 import {
   createNotification,
   listSentNotifications,
@@ -16,7 +16,7 @@ router.get("/inbox", requireCeoDashboard, getInbox);
 router.get("/unread-count", requireCeoDashboard, getUnreadCount);
 router.patch("/:id/read", requireCeoDashboard, markRead);
 
-router.post("/", requireRole("ceo"), createNotification);
-router.get("/", requireRole("ceo"), listSentNotifications);
+router.post("/", requireFullAccess, createNotification);
+router.get("/", requireFullAccess, listSentNotifications);
 
 export default router;

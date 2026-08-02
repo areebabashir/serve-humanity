@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 
 /**
  * Org / system roles:
- * - CEO dashboard: ceo + bog_*
+ * - CEO dashboard: ceo, founder, cto, coo + bog_*
+ * - Full access (everything): ceo, founder, cto, coo
  * - Chapter dashboard: president | member
  * - Public site: public
  *
@@ -11,6 +12,9 @@ import bcrypt from "bcryptjs";
  */
 export const SYSTEM_ROLES = [
   "ceo",
+  "founder",
+  "cto",
+  "coo",
   "bog_verification",
   "bog_operations",
   "bog_media",
@@ -38,14 +42,24 @@ export const CHAPTER_ROLES = [
   "member",
 ];
 
+/** Roles with complete CEO-dashboard access (all modules + admin actions) */
+export const FULL_ACCESS_ROLES = ["ceo", "founder", "cto", "coo"];
+
 export const CEO_DASHBOARD_ROLES = [
   "ceo",
+  "founder",
+  "cto",
+  "coo",
   "bog_verification",
   "bog_operations",
   "bog_media",
   "bog_finance",
   "bog_documentation",
 ];
+
+export function isFullAccessRole(role) {
+  return FULL_ACCESS_ROLES.includes(role);
+}
 
 const userSchema = new mongoose.Schema(
   {

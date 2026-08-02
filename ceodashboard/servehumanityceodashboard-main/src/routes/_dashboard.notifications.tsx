@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { isFullAccessRole } from "@/lib/roles";
 import {
   AUDIENCE_LABELS,
   createNotification,
@@ -53,7 +54,7 @@ function priorityVariant(p: NotificationPriority): "secondary" | "default" | "de
 
 function NotificationsPage() {
   const { user } = useAuth();
-  const isCeo = user?.systemRole === "ceo";
+  const isCeo = isFullAccessRole(user?.systemRole);
   const [tab, setTab] = useState(isCeo ? "compose" : "inbox");
 
   const [title, setTitle] = useState("");
