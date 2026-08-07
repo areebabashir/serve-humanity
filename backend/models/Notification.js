@@ -8,6 +8,8 @@ const recipientSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     email: { type: String, default: "" },
     readAt: { type: Date, default: null },
+    /** Soft-delete for this recipient only — does not remove the notification for others. */
+    dismissedAt: { type: Date, default: null },
     emailedAt: { type: Date, default: null },
     emailError: { type: String, default: null },
   },

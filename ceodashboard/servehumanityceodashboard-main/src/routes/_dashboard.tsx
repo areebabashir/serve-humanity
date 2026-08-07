@@ -58,6 +58,7 @@ const routeLabels: Record<string, string> = {
   notifications: "Notifications",
   reviews: "Reviews",
   "contact-messages": "Contact Messages",
+  newsletter: "Newsletter",
   "website-events": "Website Events",
   settings: "Settings",
 };

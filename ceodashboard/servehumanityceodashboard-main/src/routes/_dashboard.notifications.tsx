@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader, PageShell } from "@/components/dashboard/page-shell";
@@ -23,6 +23,7 @@ import { isFullAccessRole } from "@/lib/roles";
 import {
   AUDIENCE_LABELS,
   createNotification,
+  dismissNotification,
   fetchInbox,
   fetchSentNotifications,
   markNotificationRead,
@@ -141,6 +142,16 @@ function NotificationsPage() {
       );
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : "Failed to mark as read");
+    }
+  }
+
+  async function handleDismiss(id: string) {
+    try {
+      await dismissNotification(id);
+      setInbox((prev) => prev.filter((n) => n._id !== id));
+      toast.success("Removed from your notifications");
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to delete");
     }
   }
 
@@ -328,11 +339,22 @@ function NotificationsPage() {
                       <p className="text-xs text-muted-foreground">
                         {n.createdBy?.name ?? "Leadership"} · {formatWhen(n.createdAt)}
                       </p>
-                      {unread && (
-                        <Button size="sm" variant="outline" onClick={() => void handleMarkRead(n._id)}>
-                          Mark as read
+                      <div className="flex flex-wrap gap-2">
+                        {unread && (
+                          <Button size="sm" variant="outline" onClick={() => void handleMarkRead(n._id)}>
+                            Mark as read
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => void handleDismiss(n._id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete
                         </Button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 );

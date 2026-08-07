@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { ChapterCard, ChapterPageHeader } from "@/components/chapter/ChapterPage";
 import {
@@ -12,6 +12,18 @@ import {
 } from "@/lib/chapterRoles";
 import { api, ApiRequestError, type AuthUser } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -39,15 +51,42 @@ function directorIdOf(u: AuthUser): string {
   return u.teamDirector._id || "none";
 }
 
+const emptyForm = {
+  name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  phone: "",
+  chapterRole: "operations_head" as ChapterRole,
+};
+
 export default function ChapterTeamPage() {
   const { user: me, refresh } = useAuth();
   const canAssign = canAssignChapterRoles(me);
   const [rows, setRows] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(emptyForm);
 
   const directors = useMemo(
     () => rows.filter((u) => isTeamHeadRole(u.chapterRole)),
     [rows],
+  );
+
+  const takenRoles = useMemo(
+    () =>
+      new Set(
+        rows
+          .filter((u) => u.isActive !== false && DIRECTOR_ASSIGNABLE_ROLES.includes((u.chapterRole as ChapterRole) || "member"))
+          .map((u) => u.chapterRole as ChapterRole),
+      ),
+    [rows],
+  );
+
+  const availableRoles = useMemo(
+    () => DIRECTOR_ASSIGNABLE_ROLES.filter((r) => !takenRoles.has(r)),
+    [takenRoles],
   );
 
   const load = useCallback(async () => {
@@ -99,14 +138,163 @@ export default function ChapterTeamPage() {
     }
   }
 
+  async function onCreate(e: FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.password) {
+      toast.error("Name, email, and password are required");
+      return;
+    }
+    if (form.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api("/users/chapter-directors", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          phone: form.phone.trim() || undefined,
+          chapterRole: form.chapterRole,
+        }),
+      });
+      toast.success("Director account created — share the email and password with them");
+      setForm(emptyForm);
+      setOpen(false);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to create account");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div>
       <ChapterPageHeader
         title="Team & Roles"
         description={
           canAssign
-            ? "Assign director roles and place members under a director team. President and VP have their own collection only — no team. You cannot change your own role."
+            ? "Create director accounts with a password, assign roles, and place members under a director team. President and VP have their own collection only — no team."
             : "Chapter login accounts and their roles."
+        }
+        actions={
+          canAssign ? (
+            <Dialog
+              open={open}
+              onOpenChange={(v) => {
+                setOpen(v);
+                if (v && availableRoles[0]) {
+                  setForm((f) => ({ ...f, chapterRole: availableRoles[0] }));
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button disabled={availableRoles.length === 0}>
+                  <UserPlus className="h-4 w-4" />
+                  Add director
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md sm:rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle>Add director account</DialogTitle>
+                  <DialogDescription>
+                    Creates a chapter login. Share the email and password with the director.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={onCreate} className="space-y-3">
+                  <div>
+                    <Label htmlFor="dir-name">Full name</Label>
+                    <Input
+                      id="dir-name"
+                      required
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="dir-email">Email</Label>
+                    <Input
+                      id="dir-email"
+                      type="email"
+                      required
+                      value={form.email}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="dir-phone">Phone (optional)</Label>
+                    <Input
+                      id="dir-phone"
+                      value={form.phone}
+                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label>Role</Label>
+                    <Select
+                      value={form.chapterRole}
+                      onValueChange={(v) =>
+                        setForm((f) => ({ ...f, chapterRole: v as ChapterRole }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableRoles.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {CHAPTER_ROLE_LABEL[r]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="dir-password">Password</Label>
+                    <Input
+                      id="dir-password"
+                      type="password"
+                      required
+                      minLength={6}
+                      value={form.password}
+                      onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="dir-confirm">Confirm password</Label>
+                    <Input
+                      id="dir-confirm"
+                      type="password"
+                      required
+                      minLength={6}
+                      value={form.confirmPassword}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, confirmPassword: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={saving || availableRoles.length === 0}>
+                      {saving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" /> Creating…
+                        </>
+                      ) : (
+                        "Create account"
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          ) : null
         }
       />
       <ChapterCard className="overflow-x-auto p-0 md:p-0">

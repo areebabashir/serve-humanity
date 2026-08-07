@@ -16,6 +16,7 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 import { Reveal } from "@/components/site/Reveal";
 import logoAsset from "@/assets/logo.png";
 import { api, ApiRequestError } from "@/lib/api";
+import { daysUntilEvent } from "@/lib/eventCountdown";
 import { LOCAL_WEBSITE_DEFAULTS, useWebsitePage } from "@/lib/websiteContent";
 import { DonateAccountButton } from "@/components/site/DonateAccountButton";
 
@@ -834,7 +835,7 @@ function Events() {
   }>("events");
   const hero = sections.hero ?? {};
   const [items, setItems] = useState<
-    { id: string; title: string; date: string; location: string; days: number }[]
+    { id: string; title: string; date: string; dateIso?: string | null; location: string; days: number }[]
   >([]);
   const title = hero.title || "Show up. Change lives.";
   const highlight = hero.titleHighlight || "Change lives.";
@@ -844,7 +845,14 @@ function Events() {
     let cancelled = false;
     api<{
       success: true;
-      data: { id: string; title: string; date: string; location: string; days: number }[];
+      data: {
+        id: string;
+        title: string;
+        date: string;
+        dateIso?: string | null;
+        location: string;
+        days: number;
+      }[];
     }>("/website-events/public?limit=3")
       .then((res) => {
         if (!cancelled) setItems((res.data || []).slice(0, 3));
@@ -877,7 +885,9 @@ function Events() {
         </Reveal>
 
         <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {items.map((e, i) => (
+          {items.map((e, i) => {
+            const days = daysUntilEvent(e.dateIso, e.days);
+            return (
             <Reveal key={e.id} delay={i}>
               <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-7 shadow-soft transition-all duration-500 hover:-translate-y-2 hover:shadow-elevated">
                 <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-brand-orange/20 blur-3xl transition-all duration-500 group-hover:scale-125" />
@@ -893,7 +903,7 @@ function Events() {
                     <Clock className="h-3.5 w-3.5" /> Starts in
                   </div>
                   <div className="font-display text-lg font-bold text-brand-blue">
-                    {e.days} <span className="text-xs font-medium">days</span>
+                    {days} <span className="text-xs font-medium">days</span>
                   </div>
                 </div>
                 <Link
@@ -904,7 +914,8 @@ function Events() {
                 </Link>
               </div>
             </Reveal>
-          ))}
+            );
+          })}
         </div>
       </div>
     </section>

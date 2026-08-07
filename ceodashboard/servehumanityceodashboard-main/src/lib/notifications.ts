@@ -79,3 +79,11 @@ export async function markNotificationRead(id: string) {
     { method: "PATCH" },
   );
 }
+
+/** Remove from the current user's inbox only (other recipients keep it). */
+export async function dismissNotification(id: string) {
+  return api<{ success: true; message?: string; data: { _id: string; dismissedAt: string } }>(
+    `/notifications/${id}/inbox`,
+    { method: "DELETE" },
+  );
+}

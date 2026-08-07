@@ -85,7 +85,7 @@ export function moduleFromPath(pathname: string): string {
   if (pathname === "/" || pathname === "") return "overview";
   if (pathname.startsWith("/documentation")) return "documentation";
   if (pathname.startsWith("/verification") || pathname.startsWith("/operations")) return "ops";
-  if (pathname.startsWith("/reviews") || pathname.startsWith("/contact-messages") || pathname.startsWith("/website-events")) return "website";
+  if (pathname.startsWith("/reviews") || pathname.startsWith("/contact-messages") || pathname.startsWith("/website-events") || pathname.startsWith("/newsletter")) return "website";
   const seg = pathname.split("/").filter(Boolean)[0] ?? "";
   return seg || "overview";
 }

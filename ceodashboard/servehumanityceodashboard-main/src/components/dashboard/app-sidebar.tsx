@@ -31,6 +31,7 @@ import {
   MessageSquareText,
   MessagesSquare,
   Calendar,
+  Mail,
 } from "lucide-react";
 
 import {
@@ -86,6 +87,7 @@ const items = [
   { title: "Website Events", url: "/website-events", module: "website", icon: Calendar },
   { title: "Reviews", url: "/reviews", module: "website", icon: MessageSquareText },
   { title: "Contact Messages", url: "/contact-messages", module: "website", icon: MessagesSquare },
+  { title: "Newsletter", url: "/newsletter", module: "website", icon: Mail },
   { title: "Documentation", url: "/documentation", module: "documentation", icon: FileText, hasSub: true },
   { title: "Finance", url: "/finance", module: "finance", icon: Wallet, hasFinanceSub: true },
   { title: "Board & Governance", url: "/board", module: "board", icon: Landmark },

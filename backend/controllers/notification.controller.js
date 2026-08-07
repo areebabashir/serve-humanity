@@ -110,6 +110,7 @@ export async function createNotification(req, res, next) {
         user: u._id,
         email: u.email,
         readAt: null,
+        dismissedAt: null,
         emailedAt: null,
         emailError: null,
       })),
@@ -169,7 +170,12 @@ export async function getInbox(req, res, next) {
     const now = new Date();
 
     const items = await Notification.find({
-      "recipients.user": userId,
+      recipients: {
+        $elemMatch: {
+          user: userId,
+          dismissedAt: null,
+        },
+      },
       $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
     })
       .sort({ createdAt: -1 })
@@ -177,20 +183,25 @@ export async function getInbox(req, res, next) {
       .populate("createdBy", "name email")
       .lean();
 
-    const data = items.map((n) => {
-      const mine = n.recipients.find((r) => String(r.user) === String(userId));
-      return {
-        _id: n._id,
-        title: n.title,
-        body: n.body,
-        priority: n.priority,
-        audience: n.audience,
-        createdBy: n.createdBy,
-        createdAt: n.createdAt,
-        expiresAt: n.expiresAt,
-        readAt: mine?.readAt ?? null,
-      };
-    });
+    const data = items
+      .map((n) => {
+        const mine = n.recipients.find(
+          (r) => String(r.user) === String(userId) && !r.dismissedAt,
+        );
+        if (!mine) return null;
+        return {
+          _id: n._id,
+          title: n.title,
+          body: n.body,
+          priority: n.priority,
+          audience: n.audience,
+          createdBy: n.createdBy,
+          createdAt: n.createdAt,
+          expiresAt: n.expiresAt,
+          readAt: mine?.readAt ?? null,
+        };
+      })
+      .filter(Boolean);
 
     res.json({ success: true, data });
   } catch (err) {
@@ -238,12 +249,49 @@ export async function getUnreadCount(req, res, next) {
         $elemMatch: {
           user: userId,
           readAt: null,
+          dismissedAt: null,
         },
       },
       $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
     });
 
     res.json({ success: true, data: { count } });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Remove a notification from the current user's inbox only.
+ * DELETE /notifications/:id/inbox
+ */
+export async function dismissFromInbox(req, res, next) {
+  try {
+    const userId = req.user._id;
+    const notification = await Notification.findById(req.params.id);
+    if (!notification) {
+      return res.status(404).json({ success: false, message: "Notification not found." });
+    }
+
+    const recipient = notification.recipients.find((r) => String(r.user) === String(userId));
+    if (!recipient) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not a recipient of this notification.",
+      });
+    }
+
+    if (!recipient.dismissedAt) {
+      recipient.dismissedAt = new Date();
+      if (!recipient.readAt) recipient.readAt = recipient.dismissedAt;
+      await notification.save();
+    }
+
+    res.json({
+      success: true,
+      message: "Removed from your notifications.",
+      data: { _id: notification._id, dismissedAt: recipient.dismissedAt },
+    });
   } catch (err) {
     next(err);
   }

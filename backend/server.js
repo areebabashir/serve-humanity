@@ -34,6 +34,8 @@ import chapterDonationRoutes from "./routes/chapterDonation.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
 import reviewRoutes from "./routes/review.routes.js";
 import websiteEventRoutes from "./routes/websiteEvent.routes.js";
+import newsletterRoutes from "./routes/newsletter.routes.js";
+import { startDonationReminderScheduler } from "./jobs/donationReminders.js";
 
 
 const app = express();
@@ -132,6 +134,7 @@ app.use(`${API}/chapter-donations`, chapterDonationRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
 app.use(`${API}/reviews`, reviewRoutes);
 app.use(`${API}/website-events`, websiteEventRoutes);
+app.use(`${API}/newsletter`, newsletterRoutes);
 
 
 // 404 + error handler
@@ -144,5 +147,6 @@ connectDB().then(() => {
   httpServer.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
+    startDonationReminderScheduler();
   });
 });

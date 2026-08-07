@@ -52,6 +52,86 @@ export async function getBoardMembers(req, res, next) {
   }
 }
 
+/**
+ * Chapter president / VP creates a director (or VP) login with password.
+ * POST /users/chapter-directors
+ */
+export async function createChapterDirector(req, res, next) {
+  try {
+    if (!canAssignRoles(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the president or vice president can create director accounts.",
+      });
+    }
+
+    const chapterId = chapterIdOf(req.user);
+    if (!chapterId) {
+      return res.status(400).json({
+        success: false,
+        message: "Your account is not linked to a chapter.",
+      });
+    }
+
+    const { name, email, password, phone, chapterRole } = req.body || {};
+
+    if (!name?.trim() || !email?.trim() || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required.",
+      });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+    if (!DIRECTOR_ASSIGNABLE_ROLES.includes(chapterRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "Pick a valid role (Vice President or a director seat).",
+      });
+    }
+
+    const exists = await User.findOne({ email: String(email).toLowerCase().trim() });
+    if (exists) {
+      return res.status(409).json({ success: false, message: "Email already registered." });
+    }
+
+    const seatTaken = await User.findOne({
+      chapter: chapterId,
+      chapterRole,
+      isActive: true,
+    });
+    if (seatTaken) {
+      return res.status(409).json({
+        success: false,
+        message: `An active ${chapterRole.replace(/_/g, " ")} already exists (${seatTaken.email}). Deactivate or change that role first.`,
+      });
+    }
+
+    const user = await User.create({
+      name: name.trim(),
+      email: String(email).toLowerCase().trim(),
+      password,
+      phone: phone?.trim() || "",
+      systemRole: "member",
+      chapterRole,
+      chapter: chapterId,
+      teamDirector: null,
+      isActive: true,
+    });
+
+    const safe = await User.findById(user._id)
+      .select("-password")
+      .populate("chapter", "name city");
+    res.status(201).json({ success: true, data: safe });
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** Leadership creates Founder / CTO / COO / BOG login */
 export async function createBogAccount(req, res, next) {
   try {

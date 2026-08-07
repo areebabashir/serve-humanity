@@ -84,6 +84,7 @@ const LEADERSHIP_MODULES = [
   "media",
   "documentation",
   "reports",
+  "notifications",
   "profile",
 ] as const;
 
@@ -91,25 +92,46 @@ const LEADERSHIP_MODULES = [
 export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
   president: [...LEADERSHIP_MODULES],
   vice_president: [...LEADERSHIP_MODULES],
-  director: ["overview", "team-collection", "profile"],
+  director: ["overview", "team-collection", "notifications", "profile"],
   finance_head: [
     "overview",
     "finance",
     "director-donations",
     "team-collection",
+    "notifications",
     "profile",
   ],
-  operations_head: ["overview", "ops", "operations", "team-collection", "profile"],
-  verification_head: ["overview", "ops", "verification", "team-collection", "profile"],
-  documentation_head: ["overview", "documentation", "team-collection", "profile"],
-  media_head: ["overview", "media", "team-collection", "profile"],
+  operations_head: [
+    "overview",
+    "ops",
+    "operations",
+    "team-collection",
+    "notifications",
+    "profile",
+  ],
+  verification_head: [
+    "overview",
+    "ops",
+    "verification",
+    "team-collection",
+    "notifications",
+    "profile",
+  ],
+  documentation_head: [
+    "overview",
+    "documentation",
+    "team-collection",
+    "notifications",
+    "profile",
+  ],
+  media_head: ["overview", "media", "team-collection", "notifications", "profile"],
   // Unused legacy roles — treat like plain members
-  it_head: ["my-donation", "profile"],
-  hr_head: ["my-donation", "profile"],
-  fundraising_head: ["my-donation", "profile"],
-  event_head: ["my-donation", "profile"],
-  assistant_director: ["my-donation", "profile"],
-  member: ["my-donation", "profile"],
+  it_head: ["my-donation", "notifications", "profile"],
+  hr_head: ["my-donation", "notifications", "profile"],
+  fundraising_head: ["my-donation", "notifications", "profile"],
+  event_head: ["my-donation", "notifications", "profile"],
+  assistant_director: ["my-donation", "notifications", "profile"],
+  member: ["my-donation", "notifications", "profile"],
 };
 
 /** Modules a role can write. */

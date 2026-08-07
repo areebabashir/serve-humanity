@@ -5,15 +5,24 @@ import { sendEmail } from "../utils/email.js";
 function formatPublicEvent(doc) {
   const d = doc.toObject ? doc.toObject() : doc;
   const dateObj = d.date ? new Date(d.date) : null;
-  const days =
-    dateObj && !Number.isNaN(dateObj.getTime())
-      ? Math.max(0, Math.ceil((dateObj.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-      : 0;
+  let days = 0;
+  if (dateObj && !Number.isNaN(dateObj.getTime())) {
+    // Calendar-day countdown (date-only events from <input type="date">).
+    const eventDay = Date.UTC(
+      dateObj.getUTCFullYear(),
+      dateObj.getUTCMonth(),
+      dateObj.getUTCDate(),
+    );
+    const now = new Date();
+    const todayDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    days = Math.max(0, Math.round((eventDay - todayDay) / (1000 * 60 * 60 * 24)));
+  }
   const dateLabel = dateObj
     ? dateObj.toLocaleDateString("en-US", {
         month: "short",
         day: "2-digit",
         year: "numeric",
+        timeZone: "UTC",
       }).toUpperCase()
     : "";
   return {

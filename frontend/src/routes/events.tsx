@@ -6,6 +6,7 @@ import { Reveal } from "@/components/site/Reveal";
 import { Calendar, MapPin, Clock, Users, Loader2 } from "lucide-react";
 import { highlightTitle, useWebsitePage } from "@/lib/websiteContent";
 import { api, ApiRequestError } from "@/lib/api";
+import { daysUntilEvent, isEventPast } from "@/lib/eventCountdown";
 import {
   Dialog,
   DialogContent,
@@ -27,14 +28,6 @@ type PublicEvent = {
   days: number;
   capacity: string;
 };
-
-function isPastEvent(e: PublicEvent) {
-  if (!e.dateIso) return e.days === 0;
-  const d = new Date(e.dateIso);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return d < now;
-}
 
 export default function Page() {
   const { sections } = useWebsitePage<EventsSections>("events");
@@ -137,7 +130,9 @@ export default function Page() {
                       <div className="mt-5 flex gap-2">
                         <div className="flex-1 rounded-2xl bg-secondary p-3">
                           <Clock className="h-3.5 w-3.5 text-brand-blue" />
-                          <div className="mt-1 font-display font-bold">{e.days}d</div>
+                          <div className="mt-1 font-display font-bold">
+                            {daysUntilEvent(e.dateIso, e.days)}d
+                          </div>
                           <div className="text-[10px] uppercase text-muted-foreground">to go</div>
                         </div>
                         <div className="flex-1 rounded-2xl bg-secondary p-3">
@@ -148,7 +143,7 @@ export default function Page() {
                           <div className="text-[10px] uppercase text-muted-foreground">capacity</div>
                         </div>
                       </div>
-                      {isPastEvent(e) ? (
+                      {isEventPast(e.dateIso) ? (
                         <div className="mt-4 w-full rounded-full border border-border bg-secondary py-2.5 text-center text-sm font-semibold text-muted-foreground">
                           Event ended
                         </div>

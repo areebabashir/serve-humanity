@@ -18,6 +18,7 @@ import {
   HandCoins,
   UsersRound,
   FileSpreadsheet,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
@@ -52,6 +53,7 @@ const NAV: NavItem[] = [
   },
   { title: "Team & Roles", to: "/chapter/team", icon: ShieldCheck, module: "team" },
   { title: "Members", to: "/chapter/members", icon: Users2, module: "members" },
+  { title: "Notifications", to: "/chapter/notifications", icon: Bell, module: "notifications" },
   { title: "Finance", to: "/chapter/finance", icon: Wallet, module: "finance" },
   {
     title: "Media Cases",

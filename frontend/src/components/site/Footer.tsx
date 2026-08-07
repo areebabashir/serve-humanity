@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
-import { Facebook, Instagram, Twitter, Youtube, Mail, ArrowUpRight, Heart } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { Facebook, Instagram, Twitter, Youtube, Mail, ArrowUpRight, Heart, Loader2 } from "lucide-react";
 import { Logo } from "./Logo";
 import { useWebsitePage } from "@/lib/websiteContent";
+import { api, ApiRequestError } from "@/lib/api";
 
 const cols = [
   {
@@ -51,6 +53,34 @@ type FooterSections = {
 export function Footer() {
   const { sections } = useWebsitePage<FooterSections>("footer");
   const social = sections.social ?? {};
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  async function onSubscribe(e: FormEvent) {
+    e.preventDefault();
+    setMsg("");
+    setErr("");
+    const value = email.trim().toLowerCase();
+    if (!value) {
+      setErr("Enter your email address.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api<{ success: true; message?: string }>("/newsletter/subscribe", {
+        method: "POST",
+        body: JSON.stringify({ email: value, source: "footer" }),
+      });
+      setMsg(res.message || "Subscribed. Thank you!");
+      setEmail("");
+    } catch (error) {
+      setErr(error instanceof ApiRequestError ? error.message : "Subscribe failed. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <footer className="relative mt-24 overflow-hidden bg-gradient-cool text-white">
@@ -80,21 +110,40 @@ export function Footer() {
                 "Monthly stories from the field, upcoming events and how your support is shaping lives. No spam — ever."}
             </p>
           </div>
-          <form onSubmit={(e) => e.preventDefault()} className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative flex-1">
-              <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
-              <input
-                type="email"
-                required
-                placeholder="you@example.com"
-                className="w-full rounded-full border border-white/10 bg-white/10 py-3 pl-11 pr-4 text-sm text-white placeholder:text-white/50 outline-none transition focus:border-brand-orange focus:bg-white/15"
-              />
-            </div>
-            <button className="group inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-warm px-5 py-3 text-sm font-semibold shadow-warm transition hover:-translate-y-0.5">
-              Subscribe
-              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:rotate-45" />
-            </button>
-          </form>
+          <div>
+            <form onSubmit={onSubscribe} className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1">
+                <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/50" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(ev) => setEmail(ev.target.value)}
+                  placeholder="you@example.com"
+                  disabled={submitting}
+                  className="w-full rounded-full border border-white/10 bg-white/10 py-3 pl-11 pr-4 text-sm text-white placeholder:text-white/50 outline-none transition focus:border-brand-orange focus:bg-white/15 disabled:opacity-70"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="group inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-warm px-5 py-3 text-sm font-semibold shadow-warm transition hover:-translate-y-0.5 disabled:opacity-70"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                  </>
+                ) : (
+                  <>
+                    Subscribe
+                    <ArrowUpRight className="h-4 w-4 transition-transform group-hover:rotate-45" />
+                  </>
+                )}
+              </button>
+            </form>
+            {msg ? <p className="mt-2 text-xs text-emerald-300">{msg}</p> : null}
+            {err ? <p className="mt-2 text-xs text-red-300">{err}</p> : null}
+          </div>
         </div>
 
         <div className="grid gap-10 md:grid-cols-[1.5fr_1fr_1fr_1fr]">

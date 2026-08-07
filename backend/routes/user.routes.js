@@ -2,7 +2,6 @@ import { Router } from "express";
 import {
   protect,
   requireFullAccess,
-  requireFullAccessOr,
   requireSystemOrChapter,
   requireCeoDashboard,
 } from "../middleware/auth.js";
@@ -13,6 +12,7 @@ import {
   deleteUser,
   getBoardMembers,
   createBogAccount,
+  createChapterDirector,
 } from "../controllers/user.controller.js";
 import { FULL_ACCESS_ROLES } from "../models/User.js";
 
@@ -22,6 +22,15 @@ router.use(protect);
 
 router.get("/board", requireCeoDashboard, getBoardMembers);
 router.post("/board", requireFullAccess, createBogAccount);
+
+router.post(
+  "/chapter-directors",
+  requireSystemOrChapter({
+    system: ["president"],
+    chapter: ["president", "vice_president"],
+  }),
+  createChapterDirector,
+);
 
 router.get(
   "/",

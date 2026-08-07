@@ -25,6 +25,7 @@ import ChapterMediaPage from "./routes/chapter/media";
 import ChapterMediaCasesPage from "./routes/chapter/media-cases";
 import ChapterTeamPage from "./routes/chapter/team";
 import ChapterMembersPage from "./routes/chapter/members";
+import ChapterNotificationsPage from "./routes/chapter/notifications";
 import ChapterProfilePage from "./routes/chapter/profile";
 import ChapterSettingsPage from "./routes/chapter/settings";
 import ChapterReportsPage from "./routes/chapter/reports";
@@ -161,6 +162,14 @@ export default function App() {
           element={
             <ChapterModule module="team">
               <ChapterTeamPage />
+            </ChapterModule>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <ChapterModule module="notifications">
+              <ChapterNotificationsPage />
             </ChapterModule>
           }
         />
