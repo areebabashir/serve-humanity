@@ -22,7 +22,9 @@ import { useAuth } from "@/lib/auth";
 import { isFullAccessRole } from "@/lib/roles";
 import {
   AUDIENCE_LABELS,
+  clearSentHistory,
   createNotification,
+  deleteSentNotification,
   dismissNotification,
   fetchInbox,
   fetchSentNotifications,
@@ -155,6 +157,38 @@ function NotificationsPage() {
     }
   }
 
+  async function handleDeleteSent(id: string) {
+    if (!confirm("Delete this notification from sent history? Recipients will no longer see it either.")) {
+      return;
+    }
+    try {
+      await deleteSentNotification(id);
+      setSent((prev) => prev.filter((n) => n._id !== id));
+      setInbox((prev) => prev.filter((n) => n._id !== id));
+      toast.success("Removed from history");
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to delete");
+    }
+  }
+
+  async function handleClearHistory() {
+    if (
+      !confirm(
+        "Clear ALL sent notification history? This removes every notification for all users.",
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await clearSentHistory();
+      setSent([]);
+      setInbox([]);
+      toast.success(res.message || "History cleared");
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to clear history");
+    }
+  }
+
   return (
     <PageShell>
       <PageHeader
@@ -273,6 +307,17 @@ function NotificationsPage() {
               <p className="text-sm text-muted-foreground">No notifications sent yet.</p>
             ) : (
               <div className="space-y-3">
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => void handleClearHistory()}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Clear all history
+                  </Button>
+                </div>
                 {sent.map((n) => (
                   <div
                     key={n._id}
@@ -283,7 +328,18 @@ function NotificationsPage() {
                         <p className="font-medium">{n.title}</p>
                         <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{n.body}</p>
                       </div>
-                      <Badge variant={priorityVariant(n.priority)}>{n.priority}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={priorityVariant(n.priority)}>{n.priority}</Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => void handleDeleteSent(n._id)}
+                          title="Delete from history"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span>{AUDIENCE_LABELS[n.audience]}</span>

@@ -15,6 +15,7 @@ type PublicChapter = {
   id: string;
   name: string;
   city: string;
+  imageUrl?: string;
   president: string;
   members: number;
   projects: number;
@@ -114,9 +115,23 @@ export default function Page() {
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {chapters.map((c, i) => (
                 <Reveal key={c.id} delay={i % 6}>
-                  <div className="group relative h-full overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated">
-                    <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-brand-orange/20 blur-3xl transition-all group-hover:scale-125" />
-                    <div className="relative">
+                  <div className="group relative h-full overflow-hidden rounded-3xl border border-border bg-card shadow-soft transition-all hover:-translate-y-1 hover:shadow-elevated">
+                    <div className="relative aspect-[16/10] overflow-hidden bg-secondary">
+                      {c.imageUrl ? (
+                        <img
+                          src={c.imageUrl}
+                          alt={`${c.city} chapter`}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-cool text-white/80">
+                          <MapPin className="h-10 w-10 opacity-70" />
+                        </div>
+                      )}
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+                    </div>
+                    <div className="relative p-6">
                       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-brand-accent">
                         <MapPin className="h-3.5 w-3.5" /> Chapter
                       </div>

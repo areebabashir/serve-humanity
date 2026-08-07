@@ -296,3 +296,34 @@ export async function dismissFromInbox(req, res, next) {
     next(err);
   }
 }
+
+/**
+ * DELETE /notifications/:id — leadership deletes sent history (removes for everyone).
+ */
+export async function deleteSentNotification(req, res, next) {
+  try {
+    const doc = await Notification.findByIdAndDelete(req.params.id);
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Notification not found." });
+    }
+    res.json({ success: true, message: "Notification removed from history." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * DELETE /notifications — clear all sent notification history.
+ */
+export async function clearSentHistory(req, res, next) {
+  try {
+    const result = await Notification.deleteMany({});
+    res.json({
+      success: true,
+      message: `Cleared ${result.deletedCount || 0} notification(s) from history.`,
+      data: { deletedCount: result.deletedCount || 0 },
+    });
+  } catch (err) {
+    next(err);
+  }
+}

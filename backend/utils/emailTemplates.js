@@ -486,4 +486,190 @@ export function buildNewsletterWelcomeEmail({ donateUrl } = {}) {
   };
 }
 
+export const NEWSLETTER_THEMES = {
+  heart: {
+    label: "Donate / Heart",
+    icon: "❤️",
+    eyebrow: "Compassion in action",
+    accent: BRAND.accent,
+    softBg: BRAND.soft,
+    softBorder: "#fde8d0",
+  },
+  food: {
+    label: "Food & Ration",
+    icon: "🍽️",
+    eyebrow: "Feed a family",
+    accent: BRAND.orange,
+    softBg: "#fff7ed",
+    softBorder: "#fed7aa",
+  },
+  medical: {
+    label: "Medical care",
+    icon: "🩺",
+    eyebrow: "Health & healing",
+    accent: BRAND.blue,
+    softBg: "#f0f5ff",
+    softBorder: "#dbe5f5",
+  },
+  education: {
+    label: "Education",
+    icon: "📚",
+    eyebrow: "Hope through learning",
+    accent: "#0f766e",
+    softBg: "#f0fdfa",
+    softBorder: "#99f6e4",
+  },
+  event: {
+    label: "Event invite",
+    icon: "📅",
+    eyebrow: "Join us",
+    accent: "#7c3aed",
+    softBg: "#f5f3ff",
+    softBorder: "#ddd6fe",
+  },
+  update: {
+    label: "Field update",
+    icon: "✨",
+    eyebrow: "From the field",
+    accent: BRAND.blue,
+    softBg: "#f8fafc",
+    softBorder: BRAND.border,
+  },
+  gratitude: {
+    label: "Thank you",
+    icon: "🤲",
+    eyebrow: "With gratitude",
+    accent: BRAND.orange,
+    softBg: BRAND.soft,
+    softBorder: "#fde8d0",
+  },
+};
+
+/**
+ * Custom composed newsletter blast to subscribers.
+ */
+export function buildComposedNewsletterEmail({
+  theme = "heart",
+  eyebrow,
+  title,
+  body,
+  ctaLabel,
+  ctaUrl,
+  subject,
+}) {
+  const year = new Date().getFullYear();
+  const themeKey = NEWSLETTER_THEMES[theme] ? theme : "heart";
+  const t = NEWSLETTER_THEMES[themeKey];
+  const safeTitle = escapeHtml(title || "Serve Humanity update");
+  const safeEyebrow = escapeHtml(eyebrow || t.eyebrow);
+  const safeBody = escapeHtml(body || "").replace(/\n/g, "<br/>");
+  const hasCta = Boolean(ctaLabel?.trim() && ctaUrl?.trim());
+  const safeCtaLabel = escapeHtml(ctaLabel || "Learn more");
+  const safeCtaUrl = escapeHtml(ctaUrl || "");
+  const mailSubject = subject?.trim() || title?.trim() || "Update from Serve Humanity";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeTitle}</title>
+</head>
+<body style="margin:0;padding:0;background:#eef1f6;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${BRAND.ink}">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f6;padding:32px 14px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid ${BRAND.border};box-shadow:0 12px 40px rgba(35,74,143,0.12)">
+
+          <tr>
+            <td style="background:linear-gradient(145deg, ${BRAND.blue} 0%, #1a3568 48%, ${t.accent} 100%);padding:34px 32px 28px;text-align:center">
+              <div style="display:inline-block;margin:0 auto 12px">${logoImgHtml()}</div>
+              <div style="font-size:36px;line-height:1;margin:0 0 12px">${t.icon}</div>
+              <div style="color:rgba(255,255,255,0.9);font-size:11px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:10px">
+                ${safeEyebrow}
+              </div>
+              <h1 style="margin:0;font-size:26px;line-height:1.3;font-weight:700;color:#ffffff">${safeTitle}</h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="height:5px;background:linear-gradient(90deg, ${BRAND.orange}, ${t.accent}, ${BRAND.blue});font-size:0;line-height:0">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:28px 32px 12px">
+              <p style="margin:0 0 10px;font-size:14px;color:${BRAND.muted}">Assalamu Alaikum,</p>
+              <div style="background:${t.softBg};border:1px solid ${t.softBorder};border-radius:16px;padding:18px 18px;margin:0 0 20px">
+                <p style="margin:0;font-size:15px;line-height:1.7;color:${BRAND.ink}">${safeBody}</p>
+              </div>
+              ${
+                hasCta
+                  ? `<p style="margin:0 0 8px;text-align:center">
+                      <a href="${safeCtaUrl}" style="display:inline-block;background:linear-gradient(135deg, ${BRAND.orange} 0%, ${t.accent} 100%);color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:13px 30px;border-radius:999px;box-shadow:0 8px 20px rgba(244,93,34,0.28)">
+                        ${safeCtaLabel} →
+                      </a>
+                    </p>
+                    <p style="margin:10px 0 0;text-align:center;font-size:12px;color:${BRAND.muted}">
+                      Or open: <a href="${safeCtaUrl}" style="color:${BRAND.blue};word-break:break-all">${safeCtaUrl}</a>
+                    </p>`
+                  : ""
+              }
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:16px 32px 28px">
+              <p style="margin:0 0 16px;font-size:12px;line-height:1.55;color:${BRAND.muted}">
+                You’re receiving this because you subscribed to Serve Humanity updates.
+              </p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${BRAND.border};padding-top:16px">
+                <tr>
+                  <td>
+                    <div style="font-size:13px;font-weight:700;color:${BRAND.blue}">Serve Humanity</div>
+                    <div style="font-size:12px;color:${BRAND.muted};margin-top:3px">Serving with compassion · Together for humanity</div>
+                    <div style="font-size:11px;color:#9ca3af;margin-top:10px">&copy; ${year} Serve Humanity. All rights reserved.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    "Assalamu Alaikum,",
+    "",
+    `${t.icon} ${eyebrow || t.eyebrow}`,
+    title || "",
+    "",
+    body || "",
+    "",
+    hasCta ? `${ctaLabel}: ${ctaUrl}` : "",
+    "",
+    "— Serve Humanity Team",
+  ]
+    .filter((line) => line !== undefined)
+    .join("\n");
+
+  const attachments = [];
+  const logo = getEmailLogoAttachment();
+  if (logo && !process.env.LOGO_URL && !process.env.EMAIL_LOGO_URL) {
+    attachments.push(logo);
+  }
+
+  return {
+    subject: mailSubject,
+    html,
+    text,
+    attachments,
+    theme: themeKey,
+  };
+}
+
+
 

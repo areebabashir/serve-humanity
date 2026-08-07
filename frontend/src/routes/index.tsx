@@ -93,6 +93,7 @@ type PublicChapter = {
   id: string;
   name: string;
   city: string;
+  imageUrl?: string;
   president: string;
   members: number;
   projects: number;
@@ -103,6 +104,7 @@ type MapPin = {
   president: string;
   members: number;
   projects: number;
+  imageUrl?: string;
   x: number;
   y: number;
 };
@@ -565,6 +567,7 @@ function Chapters({ sections }: { sections: HomeSections }) {
               president: c.president || "TBD",
               members: Number(c.members) || 0,
               projects: Number(c.projects) || 0,
+              imageUrl: c.imageUrl || "",
               x: pos.x,
               y: pos.y,
             };
@@ -666,6 +669,14 @@ function Chapters({ sections }: { sections: HomeSections }) {
             <div className="rounded-3xl border border-border bg-card p-7 shadow-soft">
               {current ? (
                 <>
+                  {current.imageUrl ? (
+                    <img
+                      src={current.imageUrl}
+                      alt={current.name}
+                      className="mb-4 h-36 w-full rounded-2xl object-cover"
+                      loading="lazy"
+                    />
+                  ) : null}
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-brand-blue">
                     <MapPin className="h-3.5 w-3.5" /> {current.name} Chapter
                   </div>

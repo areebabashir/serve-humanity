@@ -6,6 +6,7 @@ import Donation from "../models/Donation.js";
 import ChapterTeamDonation from "../models/ChapterTeamDonation.js";
 import WelfareCase from "../models/WelfareCase.js";
 import { TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
+import { uploadToCloudinary } from "../middleware/upload.js";
 
 const PRESIDENT_FIELDS = "name email phone avatar systemRole chapterRole lastLogin isActive";
 
@@ -34,6 +35,7 @@ export async function getPublicChapters(req, res, next) {
       id: String(c._id),
       name: c.name,
       city: c.city,
+      imageUrl: c.imageUrl || "",
       president: c.president?.name || "TBD",
       members: c.memberCount ?? 0,
       projects: c.casesClosed ?? 0,
@@ -137,7 +139,20 @@ export async function createChapter(req, res, next) {
       established: established ? new Date(established) : new Date(),
       monthlyBudget: Number(monthlyBudget) > 0 ? Number(monthlyBudget) : 800000,
       budgetThreshold: Number(budgetThreshold) > 0 ? Number(budgetThreshold) : 100000,
+      imageUrl: "",
+      imagePublicId: "",
     });
+
+    if (req.file) {
+      try {
+        const uploaded = await uploadToCloudinary(req.file, "serve-humanity/chapters");
+        chapter.imageUrl = uploaded.secure_url || "";
+        chapter.imagePublicId = uploaded.public_id || "";
+        await chapter.save();
+      } catch (uploadErr) {
+        console.warn("Chapter image upload failed:", uploadErr?.message || uploadErr);
+      }
+    }
 
     if (presidentId) {
       await User.findByIdAndUpdate(presidentId, {
@@ -388,13 +403,56 @@ export async function assignChapterPresident(req, res, next) {
 
 export async function updateChapter(req, res, next) {
   try {
-    const chapter = await Chapter.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    const allowed = [
+      "name",
+      "city",
+      "status",
+      "established",
+      "monthlyBudget",
+      "budgetThreshold",
+      "monthlySpent",
+      "memberCount",
+      "casesClosed",
+      "fundsRaised",
+      "totalEvents",
+      "lastActivity",
+    ];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body?.[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    const chapter = await Chapter.findByIdAndUpdate(req.params.id, updates, {
+      new: true,
+      runValidators: true,
+    });
     if (!chapter) return res.status(404).json({ success: false, message: "Chapter not found." });
 
     // Real-time push
     req.app.get("io")?.to(`chapter:${chapter._id}`).emit("chapter:updated", chapter);
 
     res.json({ success: true, data: chapter });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** PATCH /chapters/:id/image — upload or replace chapter photo */
+export async function updateChapterImage(req, res, next) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "Image file is required." });
+    }
+    const chapter = await Chapter.findById(req.params.id);
+    if (!chapter) return res.status(404).json({ success: false, message: "Chapter not found." });
+
+    const uploaded = await uploadToCloudinary(req.file, "serve-humanity/chapters");
+    chapter.imageUrl = uploaded.secure_url || "";
+    chapter.imagePublicId = uploaded.public_id || "";
+    await chapter.save();
+
+    const populated = await Chapter.findById(chapter._id).populate("president", PRESIDENT_FIELDS);
+    res.json({ success: true, data: populated });
   } catch (err) {
     next(err);
   }

@@ -1,7 +1,11 @@
 import NewsletterSubscriber from "../models/NewsletterSubscriber.js";
 import { sendEmail } from "../utils/email.js";
 import { sendDueDonationReminders } from "../jobs/donationReminders.js";
-import { buildNewsletterWelcomeEmail } from "../utils/emailTemplates.js";
+import {
+  buildNewsletterWelcomeEmail,
+  buildComposedNewsletterEmail,
+  NEWSLETTER_THEMES,
+} from "../utils/emailTemplates.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -129,6 +133,103 @@ export async function sendDonationRemindersNow(req, res, next) {
       success: true,
       message: `Sent ${result.sent} donation reminder(s).`,
       data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /newsletter/themes — available compose icons/themes */
+export async function listNewsletterThemes(_req, res) {
+  const data = Object.entries(NEWSLETTER_THEMES).map(([id, t]) => ({
+    id,
+    label: t.label,
+    icon: t.icon,
+    eyebrow: t.eyebrow,
+  }));
+  res.json({ success: true, data });
+}
+
+/**
+ * POST /newsletter/compose-send
+ * Compose a custom newsletter email and send to all active subscribers.
+ */
+export async function composeAndSendNewsletter(req, res, next) {
+  try {
+    const {
+      theme = "heart",
+      eyebrow,
+      title,
+      body,
+      subject,
+      ctaLabel,
+      ctaUrl,
+    } = req.body || {};
+
+    if (!title?.trim() || !body?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Title and message body are required.",
+      });
+    }
+    if (!NEWSLETTER_THEMES[theme]) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid theme. Pick a valid icon theme.",
+      });
+    }
+
+    const subscribers = await NewsletterSubscriber.find({ isActive: true })
+      .select("_id email")
+      .limit(1000)
+      .lean();
+
+    if (!subscribers.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No active subscribers to email.",
+      });
+    }
+
+    const mail = buildComposedNewsletterEmail({
+      theme,
+      eyebrow,
+      title: String(title).trim(),
+      body: String(body).trim(),
+      subject: subject ? String(subject).trim() : undefined,
+      ctaLabel: ctaLabel ? String(ctaLabel).trim() : "",
+      ctaUrl: ctaUrl ? String(ctaUrl).trim() : "",
+    });
+
+    let sent = 0;
+    let failed = 0;
+    for (const sub of subscribers) {
+      try {
+        const result = await sendEmail({
+          to: sub.email,
+          subject: mail.subject,
+          html: mail.html,
+          text: mail.text,
+          attachments: mail.attachments,
+        });
+        if (result) sent += 1;
+        else failed += 1;
+      } catch (err) {
+        failed += 1;
+        console.warn(`Compose newsletter failed for ${sub.email}:`, err?.message || err);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Sent to ${sent} subscriber(s).`,
+      data: {
+        theme: mail.theme,
+        subject: mail.subject,
+        candidateCount: subscribers.length,
+        sent,
+        failed,
+      },
     });
   } catch (err) {
     next(err);

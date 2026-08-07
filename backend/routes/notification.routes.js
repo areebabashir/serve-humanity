@@ -7,6 +7,8 @@ import {
   markRead,
   getUnreadCount,
   dismissFromInbox,
+  deleteSentNotification,
+  clearSentHistory,
 } from "../controllers/notification.controller.js";
 
 const router = Router();
@@ -21,5 +23,7 @@ router.delete("/:id/inbox", dismissFromInbox);
 
 router.post("/", requireFullAccess, createNotification);
 router.get("/", requireFullAccess, listSentNotifications);
+router.delete("/", requireFullAccess, clearSentHistory);
+router.delete("/:id", requireFullAccess, deleteSentNotification);
 
 export default router;

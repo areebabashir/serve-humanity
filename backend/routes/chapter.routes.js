@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { protect, requireFullAccess, requireFullAccessOr, requireCeoDashboard } from "../middleware/auth.js";
+import {
+  protect,
+  requireFullAccess,
+  requireFullAccessOr,
+  requireCeoDashboard,
+} from "../middleware/auth.js";
+import { upload } from "../middleware/upload.js";
 import {
   getAllChapters,
   getPublicChapters,
@@ -9,6 +15,7 @@ import {
   createChapter,
   assignChapterPresident,
   updateChapter,
+  updateChapterImage,
   deleteChapter,
   getChapterStats,
 } from "../controllers/chapter.controller.js";
@@ -21,8 +28,9 @@ router.get("/:id/heads", getChapterHeads);
 router.get("/:id/details", protect, requireCeoDashboard, getChapterDetails);
 router.get("/:id/stats", protect, getChapterStats);
 router.get("/:id", getChapter);
-router.post("/", protect, requireFullAccess, createChapter);
+router.post("/", protect, requireFullAccess, upload.single("image"), createChapter);
 router.patch("/:id/president", protect, requireFullAccess, assignChapterPresident);
+router.patch("/:id/image", protect, requireFullAccess, upload.single("image"), updateChapterImage);
 router.patch("/:id", protect, requireFullAccessOr("president"), updateChapter);
 router.delete("/:id", protect, requireFullAccess, deleteChapter);
 

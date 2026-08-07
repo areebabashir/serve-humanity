@@ -87,3 +87,18 @@ export async function dismissNotification(id: string) {
     { method: "DELETE" },
   );
 }
+
+/** Leadership: delete one sent notification (removes for everyone). */
+export async function deleteSentNotification(id: string) {
+  return api<{ success: true; message?: string }>(`/notifications/${id}`, {
+    method: "DELETE",
+  });
+}
+
+/** Leadership: clear all sent notification history. */
+export async function clearSentHistory() {
+  return api<{ success: true; message?: string; data: { deletedCount: number } }>(
+    "/notifications",
+    { method: "DELETE" },
+  );
+}

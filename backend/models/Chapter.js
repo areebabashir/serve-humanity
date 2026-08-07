@@ -4,6 +4,9 @@ const chapterSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     city: { type: String, required: true, trim: true },
+    /** Public chapter card / map photo (Cloudinary). */
+    imageUrl: { type: String, default: "" },
+    imagePublicId: { type: String, default: "" },
     president: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     established: { type: Date, default: null },

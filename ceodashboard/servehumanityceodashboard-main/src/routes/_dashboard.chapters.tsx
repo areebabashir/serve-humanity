@@ -57,6 +57,7 @@ type ChapterRow = {
   _id: string;
   name: string;
   city: string;
+  imageUrl?: string;
   president?: ChapterPresident | string;
   status: "active" | "inactive";
   established?: string | null;
@@ -178,6 +179,7 @@ const emptyForm = {
   presidentEmail: "",
   presidentPassword: "",
   established: "",
+  image: null as File | null,
 };
 
 function ChaptersPage() {
@@ -199,6 +201,7 @@ function ChaptersPage() {
   const [presidentActionLoading, setPresidentActionLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChapterRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -306,16 +309,18 @@ function ChaptersPage() {
 
     setSaving(true);
     try {
+      const body = new FormData();
+      body.append("name", form.name.trim());
+      body.append("city", form.city.trim());
+      if (form.established) body.append("established", form.established);
+      if (form.presidentName.trim()) body.append("presidentName", form.presidentName.trim());
+      if (form.presidentEmail.trim()) body.append("presidentEmail", form.presidentEmail.trim());
+      if (form.presidentPassword) body.append("presidentPassword", form.presidentPassword);
+      if (form.image) body.append("image", form.image);
+
       await api("/chapters", {
         method: "POST",
-        body: JSON.stringify({
-          name: form.name.trim(),
-          city: form.city.trim(),
-          established: form.established || undefined,
-          presidentName: form.presidentName.trim() || undefined,
-          presidentEmail: form.presidentEmail.trim() || undefined,
-          presidentPassword: form.presidentPassword || undefined,
-        }),
+        body,
       });
       toast.success("Chapter created");
       setForm(emptyForm);
@@ -345,6 +350,22 @@ function ChaptersPage() {
       toast.error(err instanceof ApiRequestError ? err.message : "Failed to delete chapter");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function onReplaceImage(file: File | null) {
+    if (!file || !detailChapterId) return;
+    setUploadingImage(true);
+    try {
+      const body = new FormData();
+      body.append("image", file);
+      await api(`/chapters/${detailChapterId}/image`, { method: "PATCH", body });
+      toast.success("Chapter image updated");
+      await Promise.all([refreshDetails(detailChapterId), load()]);
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Image upload failed");
+    } finally {
+      setUploadingImage(false);
     }
   }
 
@@ -392,6 +413,24 @@ function ChaptersPage() {
                         onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                         required
                       />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="chapter-image">Chapter image</Label>
+                      <Input
+                        id="chapter-image"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, image: e.target.files?.[0] || null }))
+                        }
+                      />
+                      {form.image ? (
+                        <p className="text-xs text-muted-foreground">{form.image.name}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Shown on the public City Chapters page.
+                        </p>
+                      )}
                     </div>
                     <div className="grid gap-1.5">
                       <Label htmlFor="president-name">President name</Label>
@@ -488,8 +527,23 @@ function ChaptersPage() {
               filtered.map((c) => (
                 <TableRow key={c._id} className="hover:bg-muted/40">
                   <TableCell>
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted-foreground">{c.city}</div>
+                    <div className="flex items-center gap-3">
+                      {c.imageUrl ? (
+                        <img
+                          src={c.imageUrl}
+                          alt=""
+                          className="h-10 w-14 shrink-0 rounded-md object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="grid h-10 w-14 shrink-0 place-items-center rounded-md border border-dashed border-border bg-muted text-[10px] text-muted-foreground">
+                          No img
+                        </div>
+                      )}
+                      <div>
+                        <div className="font-medium">{c.name}</div>
+                        <div className="text-xs text-muted-foreground">{c.city}</div>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>{presidentLabel(c.president)}</TableCell>
                   <TableCell className="text-right">{c.memberCount ?? 0}</TableCell>
@@ -585,6 +639,37 @@ function ChaptersPage() {
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-4 space-y-3">
+                  <div className="overflow-hidden rounded-xl border border-border">
+                    {chapter.imageUrl ? (
+                      <img
+                        src={chapter.imageUrl}
+                        alt={chapter.name}
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="grid h-28 place-items-center bg-muted text-sm text-muted-foreground">
+                        No chapter image yet
+                      </div>
+                    )}
+                    {isCeo ? (
+                      <div className="flex flex-wrap items-center gap-2 border-t border-border p-3">
+                        <Label htmlFor="replace-chapter-image" className="text-xs text-muted-foreground">
+                          {uploadingImage ? "Uploading…" : "Change image"}
+                        </Label>
+                        <Input
+                          id="replace-chapter-image"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          disabled={uploadingImage}
+                          className="max-w-xs"
+                          onChange={(e) => {
+                            void onReplaceImage(e.target.files?.[0] || null);
+                            e.target.value = "";
+                          }}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="rounded-xl border border-border">
                     <Table>
                       <TableBody>
