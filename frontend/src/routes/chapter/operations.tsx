@@ -10,8 +10,8 @@ export default function ChapterOperationsPage() {
   return (
     <div>
       <ChapterPageHeader
-        title="Team Operations"
-        description="Chapter operation sheet — Case Number, Family Guardian, City, Rashan Status."
+        title="Ration Cases Status File"
+        description="Chapter ration cases status sheet — Case Number, Family Guardian, City, Rashan Status."
       />
       <OperationTeamPanel canWrite={canWrite} />
     </div>

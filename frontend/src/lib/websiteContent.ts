@@ -26,6 +26,24 @@ export const LOCAL_WEBSITE_DEFAULTS: Record<string, Record<string, unknown>> = {
       title: "Trusted by partners around the world",
       items: [],
     },
+    donateCta: {
+      eyebrow: "Make a difference today",
+      title: "Your donation,",
+      titleHighlight: "multiplied by love",
+      body: "Every donation is tracked, verified and delivered through our chapter network.",
+      cta: "Donate now",
+    },
+    chaptersMap: {
+      eyebrow: "Global chapters",
+      title: "Local roots,",
+      titleHighlight: "global reach",
+    },
+    testimonials: {
+      eyebrow: "Voices",
+      title: "Stories from the",
+      titleHighlight: "people we serve",
+      items: [],
+    },
     story: {
       eyebrow: "Our story",
       title: "A decade of turning",
@@ -302,10 +320,18 @@ export const LOCAL_WEBSITE_DEFAULTS: Record<string, Record<string, unknown>> = {
       title: "Your gift, multiplied",
       titleHighlight: "multiplied",
       description:
-        "Choose an amount, pick a cause, and see the exact impact of your donation before you give.",
+        "Support Serve Humanity with a bank transfer — every rupee is tracked and delivered through our chapter network.",
     },
+    cta: "Donate now",
     causes: ["General", "Food", "Education", "Healthcare", "Orphans", "Water"],
     note: "92% of donations go directly to programs.",
+    bankAccount: {
+      bankName: "Serve Humanity Official Account",
+      accountTitle: "Serve Humanity",
+      accountNumber: "0000-0000000000",
+      iban: "",
+      note: "Transfer your donation to this account, then share the receipt with your chapter or hello@servehumanity.org.",
+    },
   },
   volunteer: {
     hero: {

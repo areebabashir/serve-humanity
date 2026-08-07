@@ -14,7 +14,7 @@ const router = Router();
 router.post("/", contactLimit, submitContact);
 
 router.use(protect);
-router.get("/", requireFullAccessOr("president"), getMessages);
-router.patch("/:id/read", requireFullAccessOr("president"), markRead);
+router.get("/", requireFullAccessOr("president", "bog_media"), getMessages);
+router.patch("/:id/read", requireFullAccessOr("president", "bog_media"), markRead);
 
 export default router;

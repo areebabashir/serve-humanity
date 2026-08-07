@@ -17,6 +17,7 @@ import {
   ListChecks,
   HandCoins,
   UsersRound,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
@@ -37,8 +38,7 @@ type NavItem = {
 
 const OPS_SUB = [
   { title: "Verification", to: "/chapter/verification", module: "verification" },
-  { title: "Operations", to: "/chapter/operations", module: "operations" },
-  { title: "Media Cases", to: "/chapter/media-cases", module: "media" },
+  { title: "Ration Cases Status File", to: "/chapter/operations", module: "operations" },
 ] as const;
 
 const NAV: NavItem[] = [
@@ -53,6 +53,12 @@ const NAV: NavItem[] = [
   { title: "Team & Roles", to: "/chapter/team", icon: ShieldCheck, module: "team" },
   { title: "Members", to: "/chapter/members", icon: Users2, module: "members" },
   { title: "Finance", to: "/chapter/finance", icon: Wallet, module: "finance" },
+  {
+    title: "Media Cases",
+    to: "/chapter/media-cases",
+    icon: FileSpreadsheet,
+    module: "media",
+  },
   { title: "Media & Graphics", to: "/chapter/media", icon: ImageIcon, module: "media" },
   { title: "Documentation", to: "/chapter/documentation", icon: FolderKanban, module: "documentation" },
   { title: "Reports", to: "/chapter/reports", icon: BarChart3, module: "reports" },
@@ -74,15 +80,13 @@ export function ChapterSidebar() {
   const leadership = isChapterLeadership(role);
   const opsActive =
     location.pathname.startsWith("/chapter/verification") ||
-    location.pathname.startsWith("/chapter/operations") ||
-    location.pathname.startsWith("/chapter/media-cases");
+    location.pathname.startsWith("/chapter/operations");
   const [opsOpen, setOpsOpen] = useState(opsActive);
 
   const showOps =
     canAccessChapterModule(role, "ops") ||
     canAccessChapterModule(role, "verification") ||
-    canAccessChapterModule(role, "operations") ||
-    canAccessChapterModule(role, "media");
+    canAccessChapterModule(role, "operations");
   const visible = NAV.filter((i) => canAccessChapterModule(role, i.module));
   const opsLinks = OPS_SUB.filter((s) => canAccessChapterModule(role, s.module));
   const plain = isPlainMember(role);
@@ -167,8 +171,6 @@ export function ChapterSidebar() {
                           >
                             {s.module === "verification" ? (
                               <ClipboardCheck className="h-3.5 w-3.5" />
-                            ) : s.module === "media" ? (
-                              <ImageIcon className="h-3.5 w-3.5" />
                             ) : (
                               <ListChecks className="h-3.5 w-3.5" />
                             )}

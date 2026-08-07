@@ -10,8 +10,8 @@ export default function ChapterMediaCasesPage() {
   return (
     <div>
       <ChapterPageHeader
-        title="Team Media Cases"
-        description="Media case sheet — same interface as verification. Date, Ref No, Description."
+        title="Reference File – Team Media and Graphic"
+        description="Media and graphic reference file — same interface as verification. Date, Ref No, Description."
       />
       <MediaTeamPanel canWrite={canWrite} />
     </div>

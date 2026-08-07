@@ -175,3 +175,85 @@ export function buildNotificationEmailTemplate({ title, body, priority = "normal
     attachments,
   };
 }
+
+/**
+ * Password reset email with branded layout + verification code.
+ */
+export function buildPasswordResetEmail({ name, code, expiresMinutes = 30 }) {
+  const safeName = escapeHtml(name || "there");
+  const safeCode = escapeHtml(String(code || ""));
+  const year = new Date().getFullYear();
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${BRAND.ink}">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:28px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BRAND.border}">
+        <tr>
+          <td style="background:linear-gradient(135deg, ${BRAND.blue} 0%, #1a3568 55%, ${BRAND.accent} 100%);padding:22px 28px">
+            <table role="presentation" width="100%"><tr>
+              <td width="72">${logoImgHtml()}</td>
+              <td style="padding-left:14px">
+                <div style="color:#fff;font-size:18px;font-weight:700">Serve Humanity</div>
+                <div style="color:rgba(255,255,255,.85);font-size:12px;margin-top:4px">Password reset</div>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr><td style="height:4px;background:linear-gradient(90deg, ${BRAND.orange}, ${BRAND.accent}, ${BRAND.blue})">&nbsp;</td></tr>
+        <tr>
+          <td style="padding:28px">
+            <p style="margin:0 0 12px;font-size:14px;color:${BRAND.muted}">Assalamu Alaikum, ${safeName},</p>
+            <h1 style="margin:0 0 12px;font-size:20px;color:${BRAND.blue}">Your reset code</h1>
+            <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:${BRAND.ink}">
+              We received a request to reset your Serve Humanity account password.
+              Enter this code on the reset page. It expires in <strong>${expiresMinutes} minutes</strong>.
+            </p>
+            <p style="margin:0 0 24px;text-align:center">
+              <span style="display:inline-block;letter-spacing:0.35em;font-size:28px;font-weight:700;color:${BRAND.blue};background:#f0f7ff;border:1px solid ${BRAND.border};border-radius:12px;padding:14px 22px">
+                ${safeCode}
+              </span>
+            </p>
+            <p style="margin:20px 0 0;font-size:12px;color:${BRAND.muted}">
+              If you didn’t request this, you can ignore this email — your password will stay the same.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 24px">
+            <div style="border-top:1px solid ${BRAND.border};padding-top:16px;font-size:11px;color:#9ca3af">
+              &copy; ${year} Serve Humanity. All rights reserved.
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    `Assalamu Alaikum, ${name || "there"},`,
+    "",
+    "Your Serve Humanity password reset code:",
+    String(code || ""),
+    "",
+    `This code expires in ${expiresMinutes} minutes.`,
+    "If you didn’t request this, ignore this email.",
+  ].join("\n");
+
+  const attachments = [];
+  const logo = getEmailLogoAttachment();
+  if (logo && !process.env.LOGO_URL && !process.env.EMAIL_LOGO_URL) {
+    attachments.push(logo);
+  }
+
+  return {
+    subject: "Your Serve Humanity password reset code",
+    html,
+    text,
+    attachments,
+  };
+}

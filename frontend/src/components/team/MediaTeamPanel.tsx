@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { downloadStyledAoaExcel } from "@/lib/excel-style";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,11 +36,11 @@ function exportMediaExcel(rows: MediaRecord[]) {
     header,
     ...rows.map((r) => [r.srNo ?? "", r.caseDate || "", r.refNo || "", r.description || ""]),
   ];
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws["!cols"] = [{ wch: 8 }, { wch: 14 }, { wch: 18 }, { wch: 48 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Media Cases");
-  XLSX.writeFile(wb, `Team-Media-Cases-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  downloadStyledAoaExcel(
+    data,
+    "Media Cases",
+    `Team-Media-Cases-${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
 }
 
 export function MediaTeamPanel({ canWrite = true }: { canWrite?: boolean }) {

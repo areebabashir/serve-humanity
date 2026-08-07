@@ -1,7 +1,10 @@
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User from "../models/User.js";
 import Chapter from "../models/Chapter.js";
 import { isTeamHeadRole } from "../lib/teamHeads.js";
+import { sendEmail } from "../utils/email.js";
+import { buildPasswordResetEmail } from "../utils/emailTemplates.js";
 
 function signToken(id) {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
@@ -24,6 +27,14 @@ async function sendToken(user, statusCode, res) {
   });
   const populated = await loadAuthUser(user._id);
   res.status(statusCode).json({ success: true, token, user: populated });
+}
+
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function generateResetCode() {
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 export async function register(req, res, next) {
@@ -140,6 +151,123 @@ export async function changePassword(req, res, next) {
     user.passwordChangedAt = new Date();
     await user.save();
     await sendToken(user, 200, res);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /auth/forgot-password — { email } */
+export async function forgotPassword(req, res, next) {
+  try {
+    const email = String(req.body?.email || "").toLowerCase().trim();
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required." });
+    }
+
+    const generic = {
+      success: true,
+      message: "If an account exists for that email, a reset code has been sent.",
+    };
+
+    const user = await User.findOne({ email }).select(
+      "+passwordResetToken +passwordResetExpires name email isActive",
+    );
+
+    if (!user || user.isActive === false) {
+      return res.json(generic);
+    }
+
+    const code = generateResetCode();
+    const expiresMinutes = 30;
+    user.passwordResetToken = hashResetToken(code);
+    user.passwordResetExpires = new Date(Date.now() + expiresMinutes * 60 * 1000);
+    await user.save({ validateBeforeSave: false });
+
+    const mail = buildPasswordResetEmail({
+      name: user.name,
+      code,
+      expiresMinutes,
+    });
+
+    try {
+      const result = await sendEmail({
+        to: user.email,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        attachments: mail.attachments,
+      });
+      if (!result) {
+        console.warn("Password reset email skipped — SMTP not configured.");
+      }
+    } catch (err) {
+      user.passwordResetToken = null;
+      user.passwordResetExpires = null;
+      await user.save({ validateBeforeSave: false });
+      console.error("Password reset email failed:", err?.message || err);
+      return res.status(500).json({
+        success: false,
+        message: "Could not send reset email. Please try again later.",
+      });
+    }
+
+    res.json(generic);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /auth/reset-password — { email, code, password } */
+export async function resetPassword(req, res, next) {
+  try {
+    const email = String(req.body?.email || "").toLowerCase().trim();
+    const code = String(req.body?.code || req.body?.token || "").replace(/\s+/g, "");
+    const { password } = req.body || {};
+
+    if (!email || !code || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, reset code, and new password are required.",
+      });
+    }
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset code must be 6 digits.",
+      });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    const hashed = hashResetToken(code);
+    const user = await User.findOne({
+      email,
+      passwordResetToken: hashed,
+      passwordResetExpires: { $gt: new Date() },
+    }).select("+password +passwordResetToken +passwordResetExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset code is invalid or has expired. Please request a new one.",
+      });
+    }
+
+    user.password = password;
+    user.passwordChangedAt = new Date();
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Password updated. You can sign in with your new password.",
+    });
   } catch (err) {
     next(err);
   }

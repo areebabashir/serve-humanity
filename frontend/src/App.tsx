@@ -11,6 +11,8 @@ import Contact from "./routes/contact";
 import Donate from "./routes/donate";
 import Login from "./routes/login";
 import Register from "./routes/register";
+import ForgotPassword from "./routes/forgot-password";
+import ResetPassword from "./routes/reset-password";
 import Faq from "./routes/faq";
 import { ChapterShell } from "./components/chapter/ChapterShell";
 import { ChapterModule } from "./components/chapter/ChapterGuard";
@@ -76,6 +78,8 @@ export default function App() {
       <Route path="/donate" element={<Donate />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/faq" element={<Faq />} />
 
       <Route path="/chapter" element={<ChapterShell />}>

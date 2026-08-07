@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { downloadStyledAoaExcel } from "@/lib/excel-style";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,21 +74,11 @@ function exportVerificationExcel(rows: VerificationRecord[]) {
       r.verifiedByMember || "",
     ]),
   ];
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws["!cols"] = [
-    { wch: 8 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 20 },
-    { wch: 18 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 28 },
-  ];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Verification");
-  XLSX.writeFile(wb, `Team-Verification-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  downloadStyledAoaExcel(
+    data,
+    "Verification",
+    `Team-Verification-${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
 }
 
 export function VerificationTeamPanel({ canWrite = true }: { canWrite?: boolean }) {

@@ -128,14 +128,14 @@ export async function downloadMonthlyCasesPdf(input: MonthlyCaseExportInput) {
 }
 
 const headerStyle = {
-  font: { bold: true, color: { rgb: "1B1B1B" }, sz: 10 },
-  fill: { fgColor: { rgb: "C6E0B4" } },
+  font: { bold: true, color: { rgb: "FFFFFF" }, sz: 11 },
+  fill: { patternType: "solid" as const, fgColor: { rgb: "0B3D91" } },
   alignment: { horizontal: "center" as const, vertical: "center" as const, wrapText: true },
   border: {
-    top: { style: "thin" as const, color: { rgb: "7F7F7F" } },
-    bottom: { style: "thin" as const, color: { rgb: "7F7F7F" } },
-    left: { style: "thin" as const, color: { rgb: "7F7F7F" } },
-    right: { style: "thin" as const, color: { rgb: "7F7F7F" } },
+    top: { style: "thin" as const, color: { rgb: "08306B" } },
+    bottom: { style: "thin" as const, color: { rgb: "08306B" } },
+    left: { style: "thin" as const, color: { rgb: "08306B" } },
+    right: { style: "thin" as const, color: { rgb: "08306B" } },
   },
 };
 
@@ -238,19 +238,10 @@ export function buildMonthlyCasesExcel(input: MonthlyCaseExportInput): {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  ws["!cols"] = [
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 16 },
-    { wch: 18 },
-    { wch: 24 },
-  ];
-  ws["!rows"] = [{ hpt: 24 }];
+  ws["!cols"] = EXCEL_HEADERS.map((h) => ({
+    wch: Math.min(42, Math.max(14, Math.ceil(h.length * 1.2) + 2)),
+  }));
+  ws["!rows"] = [{ hpt: 36 }];
 
   if (input.description?.trim()) {
     const descRow = totalRowIdx + 1;

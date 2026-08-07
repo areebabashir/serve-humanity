@@ -14,6 +14,9 @@ function redirectForRole(user: AuthUser, token?: string | null, navigate?: (path
   const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
   const ceoBoardRoles = [
     "ceo",
+    "founder",
+    "cto",
+    "coo",
     "bog_verification",
     "bog_operations",
     "bog_media",
@@ -134,7 +137,9 @@ export default function Page() {
                 <label className="inline-flex items-center gap-1.5 text-muted-foreground">
                   <input type="checkbox" className="rounded border-border" /> Remember me
                 </label>
-                <span className="font-semibold text-muted-foreground">Forgot password?</span>
+                <Link to="/forgot-password" className="font-semibold text-brand-blue hover:underline">
+                  Forgot password?
+                </Link>
               </div>
               <button
                 type="submit"

@@ -10,20 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as DashboardRouteImport } from './routes/_dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as DashboardIndexRouteImport } from './routes/_dashboard.index'
 import { Route as DashboardBoardRouteImport } from './routes/_dashboard.board'
 import { Route as DashboardChaptersRouteImport } from './routes/_dashboard.chapters'
+import { Route as DashboardContactMessagesRouteImport } from './routes/_dashboard.contact-messages'
 import { Route as DashboardDocumentationRouteImport } from './routes/_dashboard.documentation'
 import { Route as DashboardFinanceRouteImport } from './routes/_dashboard.finance'
 import { Route as DashboardMediaRouteImport } from './routes/_dashboard.media'
 import { Route as DashboardNotificationsRouteImport } from './routes/_dashboard.notifications'
 import { Route as DashboardOperationsRouteImport } from './routes/_dashboard.operations'
 import { Route as DashboardReportsRouteImport } from './routes/_dashboard.reports'
+import { Route as DashboardReviewsRouteImport } from './routes/_dashboard.reviews'
 import { Route as DashboardRolesRouteImport } from './routes/_dashboard.roles'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard.settings'
 import { Route as DashboardVerificationRouteImport } from './routes/_dashboard.verification'
 import { Route as DashboardWebsiteRouteImport } from './routes/_dashboard.website'
+import { Route as DashboardWebsiteEventsRouteImport } from './routes/_dashboard.website-events'
 import { Route as DashboardDocumentationIndexRouteImport } from './routes/_dashboard.documentation.index'
 import { Route as DashboardDocumentationDocTypeRouteImport } from './routes/_dashboard.documentation.$docType'
 import { Route as DashboardDocumentationDrivesRouteImport } from './routes/_dashboard.documentation.drives'
@@ -47,9 +52,19 @@ const DashboardRoute = DashboardRouteImport.update({
   id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
@@ -67,6 +82,12 @@ const DashboardChaptersRoute = DashboardChaptersRouteImport.update({
   path: '/chapters',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardContactMessagesRoute =
+  DashboardContactMessagesRouteImport.update({
+    id: '/contact-messages',
+    path: '/contact-messages',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardDocumentationRoute = DashboardDocumentationRouteImport.update({
   id: '/documentation',
   path: '/documentation',
@@ -97,6 +118,11 @@ const DashboardReportsRoute = DashboardReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardReviewsRoute = DashboardReviewsRouteImport.update({
+  id: '/reviews',
+  path: '/reviews',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardRolesRoute = DashboardRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
@@ -115,6 +141,11 @@ const DashboardVerificationRoute = DashboardVerificationRouteImport.update({
 const DashboardWebsiteRoute = DashboardWebsiteRouteImport.update({
   id: '/website',
   path: '/website',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardWebsiteEventsRoute = DashboardWebsiteEventsRouteImport.update({
+  id: '/website-events',
+  path: '/website-events',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardDocumentationIndexRoute =
@@ -224,19 +255,24 @@ const DashboardMediaTemplatesRoute = DashboardMediaTemplatesRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof DashboardIndexRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/board': typeof DashboardBoardRoute
   '/chapters': typeof DashboardChaptersRoute
+  '/contact-messages': typeof DashboardContactMessagesRoute
   '/documentation': typeof DashboardDocumentationRouteWithChildren
   '/finance': typeof DashboardFinanceRouteWithChildren
   '/media': typeof DashboardMediaRouteWithChildren
   '/notifications': typeof DashboardNotificationsRoute
   '/operations': typeof DashboardOperationsRoute
   '/reports': typeof DashboardReportsRoute
+  '/reviews': typeof DashboardReviewsRoute
   '/roles': typeof DashboardRolesRoute
   '/settings': typeof DashboardSettingsRoute
   '/verification': typeof DashboardVerificationRoute
   '/website': typeof DashboardWebsiteRoute
+  '/website-events': typeof DashboardWebsiteEventsRoute
   '/documentation/$docType': typeof DashboardDocumentationDocTypeRoute
   '/documentation/drives': typeof DashboardDocumentationDrivesRoute
   '/documentation/fee': typeof DashboardDocumentationFeeRoute
@@ -257,16 +293,21 @@ export interface FileRoutesByFullPath {
   '/media/': typeof DashboardMediaIndexRoute
 }
 export interface FileRoutesByTo {
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/board': typeof DashboardBoardRoute
   '/chapters': typeof DashboardChaptersRoute
+  '/contact-messages': typeof DashboardContactMessagesRoute
   '/notifications': typeof DashboardNotificationsRoute
   '/operations': typeof DashboardOperationsRoute
   '/reports': typeof DashboardReportsRoute
+  '/reviews': typeof DashboardReviewsRoute
   '/roles': typeof DashboardRolesRoute
   '/settings': typeof DashboardSettingsRoute
   '/verification': typeof DashboardVerificationRoute
   '/website': typeof DashboardWebsiteRoute
+  '/website-events': typeof DashboardWebsiteEventsRoute
   '/': typeof DashboardIndexRoute
   '/documentation/$docType': typeof DashboardDocumentationDocTypeRoute
   '/documentation/drives': typeof DashboardDocumentationDrivesRoute
@@ -290,19 +331,24 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_dashboard': typeof DashboardRouteWithChildren
+  '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/_dashboard/board': typeof DashboardBoardRoute
   '/_dashboard/chapters': typeof DashboardChaptersRoute
+  '/_dashboard/contact-messages': typeof DashboardContactMessagesRoute
   '/_dashboard/documentation': typeof DashboardDocumentationRouteWithChildren
   '/_dashboard/finance': typeof DashboardFinanceRouteWithChildren
   '/_dashboard/media': typeof DashboardMediaRouteWithChildren
   '/_dashboard/notifications': typeof DashboardNotificationsRoute
   '/_dashboard/operations': typeof DashboardOperationsRoute
   '/_dashboard/reports': typeof DashboardReportsRoute
+  '/_dashboard/reviews': typeof DashboardReviewsRoute
   '/_dashboard/roles': typeof DashboardRolesRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/verification': typeof DashboardVerificationRoute
   '/_dashboard/website': typeof DashboardWebsiteRoute
+  '/_dashboard/website-events': typeof DashboardWebsiteEventsRoute
   '/_dashboard/': typeof DashboardIndexRoute
   '/_dashboard/documentation/$docType': typeof DashboardDocumentationDocTypeRoute
   '/_dashboard/documentation/drives': typeof DashboardDocumentationDrivesRoute
@@ -327,19 +373,24 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/board'
     | '/chapters'
+    | '/contact-messages'
     | '/documentation'
     | '/finance'
     | '/media'
     | '/notifications'
     | '/operations'
     | '/reports'
+    | '/reviews'
     | '/roles'
     | '/settings'
     | '/verification'
     | '/website'
+    | '/website-events'
     | '/documentation/$docType'
     | '/documentation/drives'
     | '/documentation/fee'
@@ -360,16 +411,21 @@ export interface FileRouteTypes {
     | '/media/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/board'
     | '/chapters'
+    | '/contact-messages'
     | '/notifications'
     | '/operations'
     | '/reports'
+    | '/reviews'
     | '/roles'
     | '/settings'
     | '/verification'
     | '/website'
+    | '/website-events'
     | '/'
     | '/documentation/$docType'
     | '/documentation/drives'
@@ -392,19 +448,24 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_dashboard'
+    | '/forgot-password'
     | '/login'
+    | '/reset-password'
     | '/_dashboard/board'
     | '/_dashboard/chapters'
+    | '/_dashboard/contact-messages'
     | '/_dashboard/documentation'
     | '/_dashboard/finance'
     | '/_dashboard/media'
     | '/_dashboard/notifications'
     | '/_dashboard/operations'
     | '/_dashboard/reports'
+    | '/_dashboard/reviews'
     | '/_dashboard/roles'
     | '/_dashboard/settings'
     | '/_dashboard/verification'
     | '/_dashboard/website'
+    | '/_dashboard/website-events'
     | '/_dashboard/'
     | '/_dashboard/documentation/$docType'
     | '/_dashboard/documentation/drives'
@@ -428,7 +489,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -440,11 +503,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard/': {
@@ -466,6 +543,13 @@ declare module '@tanstack/react-router' {
       path: '/chapters'
       fullPath: '/chapters'
       preLoaderRoute: typeof DashboardChaptersRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/contact-messages': {
+      id: '/_dashboard/contact-messages'
+      path: '/contact-messages'
+      fullPath: '/contact-messages'
+      preLoaderRoute: typeof DashboardContactMessagesRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/documentation': {
@@ -510,6 +594,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/reviews': {
+      id: '/_dashboard/reviews'
+      path: '/reviews'
+      fullPath: '/reviews'
+      preLoaderRoute: typeof DashboardReviewsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/roles': {
       id: '/_dashboard/roles'
       path: '/roles'
@@ -536,6 +627,13 @@ declare module '@tanstack/react-router' {
       path: '/website'
       fullPath: '/website'
       preLoaderRoute: typeof DashboardWebsiteRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/website-events': {
+      id: '/_dashboard/website-events'
+      path: '/website-events'
+      fullPath: '/website-events'
+      preLoaderRoute: typeof DashboardWebsiteEventsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/documentation/': {
@@ -741,32 +839,38 @@ const DashboardMediaRouteWithChildren = DashboardMediaRoute._addFileChildren(
 interface DashboardRouteChildren {
   DashboardBoardRoute: typeof DashboardBoardRoute
   DashboardChaptersRoute: typeof DashboardChaptersRoute
+  DashboardContactMessagesRoute: typeof DashboardContactMessagesRoute
   DashboardDocumentationRoute: typeof DashboardDocumentationRouteWithChildren
   DashboardFinanceRoute: typeof DashboardFinanceRouteWithChildren
   DashboardMediaRoute: typeof DashboardMediaRouteWithChildren
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
   DashboardOperationsRoute: typeof DashboardOperationsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
+  DashboardReviewsRoute: typeof DashboardReviewsRoute
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardVerificationRoute: typeof DashboardVerificationRoute
   DashboardWebsiteRoute: typeof DashboardWebsiteRoute
+  DashboardWebsiteEventsRoute: typeof DashboardWebsiteEventsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBoardRoute: DashboardBoardRoute,
   DashboardChaptersRoute: DashboardChaptersRoute,
+  DashboardContactMessagesRoute: DashboardContactMessagesRoute,
   DashboardDocumentationRoute: DashboardDocumentationRouteWithChildren,
   DashboardFinanceRoute: DashboardFinanceRouteWithChildren,
   DashboardMediaRoute: DashboardMediaRouteWithChildren,
   DashboardNotificationsRoute: DashboardNotificationsRoute,
   DashboardOperationsRoute: DashboardOperationsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
+  DashboardReviewsRoute: DashboardReviewsRoute,
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardVerificationRoute: DashboardVerificationRoute,
   DashboardWebsiteRoute: DashboardWebsiteRoute,
+  DashboardWebsiteEventsRoute: DashboardWebsiteEventsRoute,
   DashboardIndexRoute: DashboardIndexRoute,
 }
 
@@ -776,7 +880,9 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

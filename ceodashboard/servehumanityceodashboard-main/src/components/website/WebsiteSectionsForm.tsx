@@ -293,6 +293,8 @@ export function WebsiteSectionsForm({
     const eightItems = asArr<{ title?: string; desc?: string }>(eightWays.items);
     const about = asObj(sections.aboutTeaser);
     const donate = asObj(sections.donateCta);
+    const chaptersMap = asObj(sections.chaptersMap);
+    const testimonials = asObj(sections.testimonials);
     const partners = asObj(sections.partners);
     const partnerItems = (() => {
       const fromItems = asArr<{ name?: string; logoUrl?: string }>(partners.items);
@@ -630,13 +632,58 @@ export function WebsiteSectionsForm({
           <TextInput label="Button text" value={str(about.cta)} onChange={(v) => patch(["aboutTeaser", "cta"], v)} />
           <TextInput label="Button link" value={str(about.ctaLink)} onChange={(v) => patch(["aboutTeaser", "ctaLink"], v)} />
         </Section>
-        <Section title="Donate call-to-action">
-          <TextInput label="Title" value={str(donate.title)} onChange={(v) => patch(["donateCta", "title"], v)} />
+        <Section title="Chapters map" description="Headings for the home map section. Chapter pins load live from Chapters.">
+          <TextInput
+            label="Small label"
+            value={str(chaptersMap.eyebrow)}
+            onChange={(v) => patch(["chaptersMap", "eyebrow"], v)}
+          />
+          <TextInput
+            label="Title (first part)"
+            value={str(chaptersMap.title)}
+            onChange={(v) => patch(["chaptersMap", "title"], v)}
+          />
+          <TextInput
+            label="Highlighted title words"
+            value={str(chaptersMap.titleHighlight)}
+            onChange={(v) => patch(["chaptersMap", "titleHighlight"], v)}
+          />
+        </Section>
+
+        <Section title="Voices / Testimonials" description="Section headings only. Reviews appear after visitors submit and you approve them under Reviews.">
+          <TextInput
+            label="Small label"
+            value={str(testimonials.eyebrow)}
+            onChange={(v) => patch(["testimonials", "eyebrow"], v)}
+          />
+          <TextInput
+            label="Title (first part)"
+            value={str(testimonials.title)}
+            onChange={(v) => patch(["testimonials", "title"], v)}
+          />
+          <TextInput
+            label="Highlighted title words"
+            value={str(testimonials.titleHighlight)}
+            onChange={(v) => patch(["testimonials", "titleHighlight"], v)}
+          />
+        </Section>
+
+        <Section title="Donate call-to-action" description="Home banner copy. Bank account number is set under Website → Donate.">
+          <TextInput
+            label="Small label"
+            value={str(donate.eyebrow)}
+            onChange={(v) => patch(["donateCta", "eyebrow"], v)}
+          />
+          <TextInput label="Title (first part)" value={str(donate.title)} onChange={(v) => patch(["donateCta", "title"], v)} />
+          <TextInput
+            label="Highlighted title words"
+            value={str(donate.titleHighlight)}
+            onChange={(v) => patch(["donateCta", "titleHighlight"], v)}
+          />
           <TextInput label="Button text" value={str(donate.cta)} onChange={(v) => patch(["donateCta", "cta"], v)} />
           <div className="sm:col-span-2">
             <TextInput label="Body" value={str(donate.body)} onChange={(v) => patch(["donateCta", "body"], v)} multiline />
           </div>
-          <TextInput label="Button link" value={str(donate.ctaLink)} onChange={(v) => patch(["donateCta", "ctaLink"], v)} />
         </Section>
         <Section
           title="Trusted partners"
@@ -1548,14 +1595,53 @@ export function WebsiteSectionsForm({
 
   if (page === "donate") {
     const hero = asObj(sections.hero);
+    const bank = asObj(sections.bankAccount);
     const causes = asArr<string>(sections.causes).map((c) => (typeof c === "string" ? c : ""));
     return (
       <div className="space-y-5">
         <HeroFields hero={hero} onChange={(h) => patch(["hero"], h)} />
+        <Section
+          title="Bank account (shared)"
+          description="Used by the Donate page and the Home donate button popup."
+        >
+          <TextInput
+            label="Donate button text"
+            value={str(sections.cta)}
+            onChange={(v) => patch(["cta"], v)}
+          />
+          <TextInput
+            label="Bank name"
+            value={str(bank.bankName)}
+            onChange={(v) => patch(["bankAccount", "bankName"], v)}
+          />
+          <TextInput
+            label="Account title"
+            value={str(bank.accountTitle)}
+            onChange={(v) => patch(["bankAccount", "accountTitle"], v)}
+          />
+          <TextInput
+            label="Account number"
+            value={str(bank.accountNumber)}
+            onChange={(v) => patch(["bankAccount", "accountNumber"], v)}
+          />
+          <TextInput
+            label="IBAN (optional)"
+            value={str(bank.iban)}
+            onChange={(v) => patch(["bankAccount", "iban"], v)}
+          />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="Modal note"
+              value={str(bank.note)}
+              onChange={(v) => patch(["bankAccount", "note"], v)}
+              multiline
+            />
+          </div>
+        </Section>
         <Section title="Donation options">
           <div className="sm:col-span-2">
             <TextInput
-              label="Note under donate button"
+              label="Note under donate section"
               value={str(sections.note)}
               onChange={(v) => patch(["note"], v)}
             />

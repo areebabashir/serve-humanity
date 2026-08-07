@@ -38,9 +38,10 @@ const routeLabels: Record<string, string> = {
   chapters: "Chapters",
   roles: "Roles & Permissions",
   verification: "Verification",
-  operations: "Operations",
+  operations: "Ration Cases Status File",
   ops: "Operations & Verification",
   media: "Media & Graphics",
+  "case-files": "Case Files",
   documentation: "Documentation",
   health: "Health Cases",
   marriage: "Marriage Cases",
@@ -55,6 +56,9 @@ const routeLabels: Record<string, string> = {
   board: "Board & Governance",
   reports: "Reports & Analytics",
   notifications: "Notifications",
+  reviews: "Reviews",
+  "contact-messages": "Contact Messages",
+  "website-events": "Website Events",
   settings: "Settings",
 };
 

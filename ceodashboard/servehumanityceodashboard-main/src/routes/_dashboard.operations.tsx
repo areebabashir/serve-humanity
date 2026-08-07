@@ -4,7 +4,7 @@ import { PageHeader, PageShell } from "@/components/dashboard/page-shell";
 import { OperationTeamPanel } from "@/components/operations/OperationTeamPanel";
 
 export const Route = createFileRoute("/_dashboard/operations")({
-  head: () => ({ meta: [{ title: "Team Operation — Serve Humanity" }] }),
+  head: () => ({ meta: [{ title: "Ration Cases Status File — Serve Humanity" }] }),
   component: OperationsPage,
 });
 
@@ -12,8 +12,8 @@ function OperationsPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Team Operation"
-        description="Operation Excel file — add rows, edit, and download."
+        title="Ration Cases Status File"
+        description="Ration cases status Excel — Case Number, Family Guardian, City, Rashan Status. Add rows, edit, and download."
       />
       <OperationTeamPanel />
     </PageShell>

@@ -59,8 +59,8 @@ const SHORTCUTS = [
   {
     module: "operations",
     to: "/chapter/operations",
-    title: "Operations",
-    blurb: "Team operations sheet",
+    title: "Ration Cases Status File",
+    blurb: "Case Number, Family Guardian, City, Rashan Status",
     icon: ListChecks,
   },
   {

@@ -1,7 +1,7 @@
 import { Helmet } from "react-helmet-async";
 import { Link } from "react-router-dom";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import CountUp from "react-countup";
 // @ts-ignore
 const CountUpComponent = (CountUp.default || CountUp) as any;
@@ -10,11 +10,14 @@ import {
   Shield, Eye, Handshake, Globe2, Lightbulb, Utensils, GraduationCap,
   Stethoscope, LifeBuoy, Baby, Droplets, Star, ChevronRight, Quote,
   Calendar, Clock, CheckCircle2, FileCheck, PackageCheck, PhoneCall,
+  Loader2,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Reveal } from "@/components/site/Reveal";
 import logoAsset from "@/assets/logo.png";
-import { useWebsitePage } from "@/lib/websiteContent";
+import { api, ApiRequestError } from "@/lib/api";
+import { LOCAL_WEBSITE_DEFAULTS, useWebsitePage } from "@/lib/websiteContent";
+import { DonateAccountButton } from "@/components/site/DonateAccountButton";
 
 type HomeSections = {
   hero?: {
@@ -66,7 +69,76 @@ type HomeSections = {
     titleHighlight?: string;
     items?: { title?: string; desc?: string }[];
   };
+  chaptersMap?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+  };
+  testimonials?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+  };
+  donateCta?: {
+    eyebrow?: string;
+    title?: string;
+    titleHighlight?: string;
+    body?: string;
+    cta?: string;
+  };
 };
+
+type PublicChapter = {
+  id: string;
+  name: string;
+  city: string;
+  president: string;
+  members: number;
+  projects: number;
+};
+
+type MapPin = {
+  name: string;
+  president: string;
+  members: number;
+  projects: number;
+  x: number;
+  y: number;
+};
+
+const CITY_MAP_COORDS: Record<string, { x: number; y: number }> = {
+  karachi: { x: 22, y: 62 },
+  lahore: { x: 32, y: 45 },
+  islamabad: { x: 35, y: 36 },
+  rawalpindi: { x: 36, y: 38 },
+  peshawar: { x: 28, y: 30 },
+  quetta: { x: 12, y: 52 },
+  dubai: { x: 52, y: 55 },
+  london: { x: 45, y: 22 },
+  "new york": { x: 18, y: 30 },
+  faisalabad: { x: 30, y: 48 },
+  multan: { x: 26, y: 52 },
+  hyderabad: { x: 24, y: 58 },
+};
+
+const FALLBACK_MAP_PINS: MapPin[] = [
+  { name: "Karachi", president: "TBD", members: 0, projects: 0, x: 22, y: 62 },
+  { name: "Lahore", president: "TBD", members: 0, projects: 0, x: 32, y: 45 },
+  { name: "Islamabad", president: "TBD", members: 0, projects: 0, x: 35, y: 36 },
+  { name: "Peshawar", president: "TBD", members: 0, projects: 0, x: 28, y: 30 },
+  { name: "Quetta", president: "TBD", members: 0, projects: 0, x: 12, y: 52 },
+  { name: "Dubai", president: "TBD", members: 0, projects: 0, x: 52, y: 55 },
+  { name: "London", president: "TBD", members: 0, projects: 0, x: 45, y: 22 },
+  { name: "New York", president: "TBD", members: 0, projects: 0, x: 18, y: 30 },
+];
+
+function coordsForCity(city: string, index: number): { x: number; y: number } {
+  const key = city.trim().toLowerCase();
+  if (CITY_MAP_COORDS[key]) return CITY_MAP_COORDS[key];
+  const col = index % 4;
+  const row = Math.floor(index / 4);
+  return { x: 18 + col * 18, y: 22 + row * 12 };
+}
 
 export default function Page() {
   return (
@@ -466,115 +538,171 @@ function Impact({ sections }: { sections: HomeSections }) {
 }
 
 /* ---------------- CHAPTERS MAP ---------------- */
-function Chapters() {
-  const pins = [
-    { name: "Karachi", president: "Ahmed Raza", members: 820, projects: 42, x: 22, y: 62 },
-    { name: "Lahore", president: "Sana Iqbal", members: 640, projects: 38, x: 32, y: 45 },
-    { name: "Islamabad", president: "Bilal Khan", members: 410, projects: 27, x: 35, y: 36 },
-    { name: "Peshawar", president: "Zara Ahmad", members: 220, projects: 18, x: 28, y: 30 },
-    { name: "Quetta", president: "Faisal Nazir", members: 190, projects: 14, x: 12, y: 52 },
-    { name: "Dubai", president: "Hina Malik", members: 150, projects: 12, x: 52, y: 55 },
-    { name: "London", president: "Omar Sheikh", members: 320, projects: 22, x: 45, y: 22 },
-    { name: "New York", president: "Ayesha Noor", members: 280, projects: 19, x: 18, y: 30 },
-  ];
+function Chapters({ sections }: { sections: HomeSections }) {
+  const mapCopy = sections.chaptersMap ?? {};
+  const [pins, setPins] = useState<MapPin[]>(FALLBACK_MAP_PINS);
   const [active, setActive] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api<{ success: true; data: PublicChapter[] }>("/chapters/public")
+      .then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res.data) ? res.data : [];
+        if (!list.length) {
+          setPins(FALLBACK_MAP_PINS);
+          return;
+        }
+        setPins(
+          list.map((c, i) => {
+            const label = c.city || c.name || `Chapter ${i + 1}`;
+            const pos = coordsForCity(label, i);
+            return {
+              name: label,
+              president: c.president || "TBD",
+              members: Number(c.members) || 0,
+              projects: Number(c.projects) || 0,
+              x: pos.x,
+              y: pos.y,
+            };
+          }),
+        );
+        setActive(0);
+      })
+      .catch(() => {
+        if (!cancelled) setPins(FALLBACK_MAP_PINS);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const current = pins[active] ?? pins[0];
 
   return (
     <section className="relative py-24">
       <div className="container-page">
         <Reveal className="mx-auto max-w-2xl text-center">
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-            Global chapters
+            {mapCopy.eyebrow || "Global chapters"}
           </span>
           <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-            Local roots, <span className="text-gradient-brand">global reach</span>
+            {mapCopy.title || "Local roots,"}{" "}
+            <span className="text-gradient-brand">{mapCopy.titleHighlight || "global reach"}</span>
           </h2>
         </Reveal>
 
         <div className="mt-14 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <Reveal className="relative overflow-hidden rounded-3xl border border-border bg-gradient-cool p-6 shadow-cool">
             <div className="absolute inset-0 bg-mesh opacity-30" />
-            {/* stylized world grid */}
-            <svg viewBox="0 0 100 60" className="relative h-full w-full">
-              <defs>
-                <pattern id="grid" width="4" height="4" patternUnits="userSpaceOnUse">
-                  <path d="M4 0 L0 0 0 4" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.2" />
-                </pattern>
-              </defs>
-              <rect width="100" height="60" fill="url(#grid)" />
-              {/* soft continent blobs */}
-              {[
-                "M10,20 Q25,15 35,25 Q40,35 25,42 Q12,40 8,32 Z",
-                "M42,18 Q58,12 66,22 Q60,35 48,32 Q42,28 42,18 Z",
-                "M70,25 Q85,20 92,32 Q86,45 74,42 Q68,36 70,25 Z",
-              ].map((d, i) => (
-                <path key={i} d={d} fill="rgba(255,255,255,0.06)" />
-              ))}
-              {pins.map((p, i) => {
-                const isActive = i === active;
-                return (
-                  <g
-                    key={p.name}
-                    transform={`translate(${p.x} ${p.y})`}
-                    onMouseEnter={() => setActive(i)}
-                    className="cursor-pointer"
-                  >
-                    <circle r={isActive ? 3 : 2} fill="#F89C1B" opacity="0.35">
-                      <animate attributeName="r" values="2;5;2" dur="2s" repeatCount="indefinite" />
-                      <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite" />
-                    </circle>
-                    <circle r={isActive ? 1.6 : 1.2} fill="#F89C1B" />
-                    <text
-                      y={-2.5}
-                      textAnchor="middle"
-                      fontSize="1.6"
-                      fill="white"
-                      opacity={isActive ? 1 : 0.6}
-                      fontWeight={600}
+            {loading ? (
+              <div className="relative grid h-64 place-items-center text-white/80">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : (
+              <svg viewBox="0 0 100 60" className="relative h-full w-full min-h-[240px]">
+                <defs>
+                  <pattern id="grid" width="4" height="4" patternUnits="userSpaceOnUse">
+                    <path
+                      d="M4 0 L0 0 0 4"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth="0.2"
+                    />
+                  </pattern>
+                </defs>
+                <rect width="100" height="60" fill="url(#grid)" />
+                {[
+                  "M10,20 Q25,15 35,25 Q40,35 25,42 Q12,40 8,32 Z",
+                  "M42,18 Q58,12 66,22 Q60,35 48,32 Q42,28 42,18 Z",
+                  "M70,25 Q85,20 92,32 Q86,45 74,42 Q68,36 70,25 Z",
+                ].map((d, i) => (
+                  <path key={i} d={d} fill="rgba(255,255,255,0.06)" />
+                ))}
+                {pins.map((p, i) => {
+                  const isActive = i === active;
+                  return (
+                    <g
+                      key={`${p.name}-${i}`}
+                      transform={`translate(${p.x} ${p.y})`}
+                      onMouseEnter={() => setActive(i)}
+                      onClick={() => setActive(i)}
+                      className="cursor-pointer"
                     >
-                      {p.name}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
+                      <circle r={isActive ? 3 : 2} fill="#F89C1B" opacity="0.35">
+                        <animate attributeName="r" values="2;5;2" dur="2s" repeatCount="indefinite" />
+                        <animate
+                          attributeName="opacity"
+                          values="0.5;0;0.5"
+                          dur="2s"
+                          repeatCount="indefinite"
+                        />
+                      </circle>
+                      <circle r={isActive ? 1.6 : 1.2} fill="#F89C1B" />
+                      <text
+                        y={-2.5}
+                        textAnchor="middle"
+                        fontSize="1.6"
+                        fill="white"
+                        opacity={isActive ? 1 : 0.6}
+                        fontWeight={600}
+                      >
+                        {p.name}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            )}
           </Reveal>
 
           <Reveal delay={1}>
             <div className="rounded-3xl border border-border bg-card p-7 shadow-soft">
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-brand-blue">
-                <MapPin className="h-3.5 w-3.5" /> {pins[active].name} Chapter
-              </div>
-              <h3 className="mt-2 font-display text-2xl font-bold">{pins[active].name}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Led by <b className="text-foreground">{pins[active].president}</b>
-              </p>
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-secondary p-4">
-                  <div className="text-xs text-muted-foreground">Members</div>
-                  <div className="font-display text-2xl font-bold">{pins[active].members}</div>
-                </div>
-                <div className="rounded-2xl bg-secondary p-4">
-                  <div className="text-xs text-muted-foreground">Projects</div>
-                  <div className="font-display text-2xl font-bold">{pins[active].projects}</div>
-                </div>
-              </div>
-              <div className="mt-5 space-y-1.5">
-                {pins.map((p, i) => (
-                  <button
-                    key={p.name}
-                    onClick={() => setActive(i)}
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition ${
-                      i === active
-                        ? "bg-accent text-brand-accent"
-                        : "text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <span className="font-medium">{p.name}</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                ))}
-              </div>
+              {current ? (
+                <>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-brand-blue">
+                    <MapPin className="h-3.5 w-3.5" /> {current.name} Chapter
+                  </div>
+                  <h3 className="mt-2 font-display text-2xl font-bold">{current.name}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Led by <b className="text-foreground">{current.president}</b>
+                  </p>
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-secondary p-4">
+                      <div className="text-xs text-muted-foreground">Members</div>
+                      <div className="font-display text-2xl font-bold">{current.members}</div>
+                    </div>
+                    <div className="rounded-2xl bg-secondary p-4">
+                      <div className="text-xs text-muted-foreground">Projects</div>
+                      <div className="font-display text-2xl font-bold">{current.projects}</div>
+                    </div>
+                  </div>
+                  <div className="mt-5 max-h-56 space-y-1.5 overflow-y-auto">
+                    {pins.map((p, i) => (
+                      <button
+                        key={`${p.name}-${i}`}
+                        type="button"
+                        onClick={() => setActive(i)}
+                        className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition ${
+                          i === active
+                            ? "bg-accent text-brand-accent"
+                            : "text-muted-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        <span className="font-medium">{p.name}</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No chapters published yet.</p>
+              )}
             </div>
           </Reveal>
         </div>
@@ -701,19 +829,46 @@ function Timeline() {
 
 /* ---------------- EVENTS ---------------- */
 function Events() {
-  const events = [
-    { title: "Ramadan Iftar Drive", date: "Mar 12, 2026", city: "Karachi", days: 42 },
-    { title: "Winter Warmth Distribution", date: "Dec 20, 2025", city: "Peshawar", days: 8 },
-    { title: "Free Medical Camp", date: "Nov 05, 2025", city: "Lahore", days: 3 },
-  ];
+  const { sections } = useWebsitePage<{
+    hero?: { eyebrow?: string; title?: string; titleHighlight?: string };
+  }>("events");
+  const hero = sections.hero ?? {};
+  const [items, setItems] = useState<
+    { id: string; title: string; date: string; location: string; days: number }[]
+  >([]);
+  const title = hero.title || "Show up. Change lives.";
+  const highlight = hero.titleHighlight || "Change lives.";
+  const titleLead = title.replace(highlight, "").trim() || "Show up.";
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{
+      success: true;
+      data: { id: string; title: string; date: string; location: string; days: number }[];
+    }>("/website-events/public?limit=3")
+      .then((res) => {
+        if (!cancelled) setItems((res.data || []).slice(0, 3));
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!items.length) return null;
+
   return (
     <section className="relative py-24">
       <div className="container-page">
         <Reveal className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">Upcoming events</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
+              {hero.eyebrow || "Upcoming events"}
+            </span>
             <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-              Show up. <span className="text-gradient-brand">Change lives.</span>
+              {titleLead} <span className="text-gradient-brand">{highlight}</span>
             </h2>
           </div>
           <Link to="/events" className="text-sm font-semibold text-brand-blue hover:underline">
@@ -722,16 +877,16 @@ function Events() {
         </Reveal>
 
         <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {events.map((e, i) => (
-            <Reveal key={e.title} delay={i}>
+          {items.map((e, i) => (
+            <Reveal key={e.id} delay={i}>
               <div className="group relative overflow-hidden rounded-3xl border border-border bg-card p-7 shadow-soft transition-all duration-500 hover:-translate-y-2 hover:shadow-elevated">
                 <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-brand-orange/20 blur-3xl transition-all duration-500 group-hover:scale-125" />
                 <div className="relative flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-brand-accent">
-                  <Calendar className="h-3.5 w-3.5" /> {e.date}
+                  <Calendar className="h-3.5 w-3.5" /> {e.date || "TBA"}
                 </div>
                 <h3 className="relative mt-3 font-display text-xl font-bold">{e.title}</h3>
                 <p className="relative mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5" /> {e.city}
+                  <MapPin className="h-3.5 w-3.5" /> {e.location || "—"}
                 </p>
                 <div className="relative mt-6 flex items-center justify-between rounded-2xl bg-secondary p-3">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -741,9 +896,12 @@ function Events() {
                     {e.days} <span className="text-xs font-medium">days</span>
                   </div>
                 </div>
-                <button className="relative mt-4 w-full rounded-full bg-gradient-warm py-2.5 text-sm font-semibold text-white shadow-warm transition-transform hover:-translate-y-0.5">
+                <Link
+                  to="/events"
+                  className="relative mt-4 flex w-full items-center justify-center rounded-full bg-gradient-warm py-2.5 text-sm font-semibold text-white shadow-warm transition-transform hover:-translate-y-0.5"
+                >
                   Register
-                </button>
+                </Link>
               </div>
             </Reveal>
           ))}
@@ -754,75 +912,202 @@ function Events() {
 }
 
 /* ---------------- TESTIMONIALS ---------------- */
-function Testimonials() {
-  const t = [
-    { name: "Aisha K.", role: "Volunteer, Lahore", text: "Serve Humanity gave me a way to turn empathy into weekly action. Life-changing.", stars: 5 },
-    { name: "Dr. Bilal", role: "Medical Camp Lead", text: "The most transparent NGO I've worked with. Every rupee has a receipt.", stars: 5 },
-    { name: "Fatima R.", role: "Donor, Dubai", text: "I sponsor two orphans. Their monthly progress reports move me to tears every time.", stars: 5 },
-    { name: "Omar S.", role: "Chapter President", text: "This is a family, not a charity. And that's what makes the impact so deep.", stars: 5 },
-    { name: "Sana M.", role: "Beneficiary", text: "They didn't just feed us. They restored our dignity. Forever grateful.", stars: 5 },
-  ];
-  const row = [...t, ...t];
+function Testimonials({ sections }: { sections: HomeSections }) {
+  const block = sections.testimonials ?? {};
+
+  const [approved, setApproved] = useState<
+    { name: string; role: string; text: string; stars: number }[]
+  >([]);
+  const [form, setForm] = useState({ name: "", role: "", text: "", stars: 5 });
+  const [submitting, setSubmitting] = useState(false);
+  const [formMsg, setFormMsg] = useState("");
+  const [formErr, setFormErr] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ success: true; data: { name: string; role?: string; text: string; stars?: number }[] }>(
+      "/reviews/public",
+    )
+      .then((res) => {
+        if (cancelled) return;
+        const list = (res.data || [])
+          .map((r) => ({
+            name: r.name || "Anonymous",
+            role: r.role || "",
+            text: r.text || "",
+            stars: Math.min(5, Math.max(1, Number(r.stars) || 5)),
+          }))
+          .filter((r) => r.text);
+        setApproved(list);
+      })
+      .catch(() => {
+        if (!cancelled) setApproved([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const t = approved.filter((item) => item.text);
+  // Duplicate once so the CSS marquee loop is seamless (off-screen clone).
+  const row = t.length ? [...t, ...t] : [];
+
+  async function submitReview(e: FormEvent) {
+    e.preventDefault();
+    setFormErr("");
+    setFormMsg("");
+    setSubmitting(true);
+    try {
+      const res = await api<{ success: true; message?: string }>("/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          name: form.name.trim(),
+          role: form.role.trim(),
+          text: form.text.trim(),
+          stars: form.stars,
+        }),
+      });
+      setFormMsg(res.message || "Submitted for approval. Thank you!");
+      setForm({ name: "", role: "", text: "", stars: 5 });
+    } catch (err) {
+      setFormErr(err instanceof ApiRequestError ? err.message : "Could not submit review.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <section className="relative overflow-hidden py-24">
       <div className="container-page">
         <Reveal className="mx-auto max-w-2xl text-center">
           <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-            Voices
+            {block.eyebrow || "Voices"}
           </span>
           <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-            Stories from the <span className="text-gradient-brand">people we serve</span>
+            {block.title || "Stories from the"}{" "}
+            <span className="text-gradient-brand">{block.titleHighlight || "people we serve"}</span>
           </h2>
         </Reveal>
       </div>
 
-      <div className="relative mt-14 group">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-24 bg-gradient-to-r from-background to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-24 bg-gradient-to-l from-background to-transparent" />
-        <div className="flex w-max animate-marquee gap-5 group-hover:[animation-play-state:paused]">
-          {row.map((r, i) => (
-            <article
-              key={i}
-              className="w-[340px] shrink-0 rounded-3xl border border-border bg-card p-6 shadow-soft"
-            >
-              <Quote className="h-6 w-6 text-brand-orange/60" />
-              <p className="mt-3 text-sm leading-relaxed text-foreground">{r.text}</p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-warm font-display font-bold text-white">
-                  {r.name[0]}
+      {t.length ? (
+        <div className="relative mt-14 group">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-background to-transparent sm:w-24" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-background to-transparent sm:w-24" />
+          <div className="flex w-max animate-marquee gap-5 group-hover:[animation-play-state:paused]">
+            {row.map((r, i) => (
+              <article
+                key={`${r.name}-${i}`}
+                className="w-[300px] shrink-0 rounded-3xl border border-border bg-card p-6 shadow-soft sm:w-[340px]"
+                aria-hidden={i >= t.length}
+              >
+                <Quote className="h-6 w-6 text-brand-orange/60" />
+                <p className="mt-3 text-sm leading-relaxed text-foreground">{r.text}</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-warm font-display font-bold text-white">
+                    {r.name[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{r.name}</div>
+                    <div className="text-xs text-muted-foreground">{r.role}</div>
+                  </div>
+                  <div className="ml-auto flex text-brand-orange">
+                    {Array.from({ length: r.stars }).map((_, si) => (
+                      <Star key={si} className="h-3 w-3 fill-current" />
+                    ))}
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold">{r.name}</div>
-                  <div className="text-xs text-muted-foreground">{r.role}</div>
-                </div>
-                <div className="ml-auto flex text-brand-orange">
-                  {Array.from({ length: r.stars }).map((_, i) => (
-                    <Star key={i} className="h-3 w-3 fill-current" />
-                  ))}
-                </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            ))}
+          </div>
         </div>
+      ) : null}
+
+      <div className="container-page mt-14">
+        <Reveal>
+          <form
+            onSubmit={submitReview}
+            className="mx-auto max-w-2xl rounded-3xl border border-border bg-card p-6 shadow-soft md:p-8"
+          >
+            <h3 className="font-display text-xl font-bold">Share your experience</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Reviews appear on the website after CEO approval.
+            </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-xs font-medium text-muted-foreground">Name</span>
+                <input
+                  required
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm outline-none focus:border-brand-orange"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-muted-foreground">Role (optional)</span>
+                <input
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  placeholder="Volunteer, Donor…"
+                  className="mt-1 w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm outline-none focus:border-brand-orange"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-xs font-medium text-muted-foreground">Your review</span>
+                <textarea
+                  required
+                  rows={3}
+                  value={form.text}
+                  onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm outline-none focus:border-brand-orange"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium text-muted-foreground">Stars</span>
+                <select
+                  value={form.stars}
+                  onChange={(e) => setForm((f) => ({ ...f, stars: Number(e.target.value) || 5 }))}
+                  className="mt-1 w-full rounded-xl border border-border bg-secondary px-4 py-2.5 text-sm outline-none focus:border-brand-orange"
+                >
+                  {[5, 4, 3, 2, 1].map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {formErr ? (
+              <p className="mt-3 text-xs text-red-700">{formErr}</p>
+            ) : null}
+            {formMsg ? (
+              <p className="mt-3 text-xs text-emerald-700">{formMsg}</p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-gradient-warm px-6 py-2.5 text-sm font-bold text-white shadow-warm disabled:opacity-70"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+                </>
+              ) : (
+                "Submit review"
+              )}
+            </button>
+          </form>
+        </Reveal>
       </div>
     </section>
   );
 }
 
 /* ---------------- DONATE ---------------- */
-function DonateCTA() {
-  const [amount, setAmount] = useState(2500);
-  const presets = [500, 1000, 2500, 5000, 10000];
-  const impact =
-    amount >= 5000
-      ? "supports a child's education for a month"
-      : amount >= 2500
-      ? "provides a family's grocery pack for 2 weeks"
-      : amount >= 1000
-      ? "delivers medicines to 3 patients"
-      : "feeds one family a warm meal";
-
-  const goalPct = Math.min(100, Math.round((amount / 10000) * 100));
+function DonateCTA({ sections }: { sections: HomeSections }) {
+  const defaults =
+    (LOCAL_WEBSITE_DEFAULTS.home as { donateCta?: HomeSections["donateCta"] }).donateCta || {};
+  const donate = { ...defaults, ...(sections.donateCta || {}) };
 
   return (
     <section className="relative py-24">
@@ -832,77 +1117,25 @@ function DonateCTA() {
           <div className="pointer-events-none absolute -left-24 -bottom-24 h-96 w-96 rounded-full bg-brand-orange/30 blur-3xl animate-blob" />
           <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl animate-blob" />
 
-          <div className="relative grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
+          <div className="relative grid gap-10 lg:grid-cols-[1.2fr_auto] lg:items-center">
             <div className="text-white">
               <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-orange">
-                Make a difference today
+                {donate.eyebrow || "Make a difference today"}
               </span>
               <h2 className="mt-3 font-display text-3xl font-bold md:text-5xl">
-                Your donation, <span className="text-gradient-warm">multiplied by love</span>
+                {donate.title || "Your donation,"}{" "}
+                <span className="text-gradient-warm">
+                  {donate.titleHighlight || "multiplied by love"}
+                </span>
               </h2>
               <p className="mt-4 max-w-md text-white/70">
-                Choose an amount and see exactly what it becomes — a meal, a medicine, a
-                lesson. Every rupee is tracked.
+                {donate.body ||
+                  "Every donation is tracked, verified and delivered through our chapter network."}
               </p>
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-white/60">
-                  <Heart className="h-3.5 w-3.5 fill-brand-orange text-brand-orange" />
-                  Your Rs. {amount.toLocaleString()} {impact}
-                </div>
-              </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/95 p-6 shadow-elevated md:p-8">
-              <div className="text-xs font-semibold uppercase tracking-widest text-brand-blue">
-                Choose amount
-              </div>
-              <div className="mt-4 grid grid-cols-5 gap-2">
-                {presets.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setAmount(p)}
-                    className={`rounded-xl border py-2.5 text-sm font-semibold transition ${
-                      amount === p
-                        ? "border-brand-orange bg-brand-orange text-white shadow-warm"
-                        : "border-border bg-secondary text-foreground hover:border-brand-orange"
-                    }`}
-                  >
-                    {p >= 1000 ? `${p / 1000}k` : p}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Or enter custom amount (Rs.)
-                </label>
-                <input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value) || 0)}
-                  className="mt-1.5 w-full rounded-xl border border-border bg-secondary px-4 py-3 font-display text-2xl font-bold outline-none focus:border-brand-orange"
-                />
-              </div>
-
-              <div className="mt-5">
-                <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-muted-foreground">
-                  <span>Toward Rs. 10,000 impact tier</span>
-                  <span>{goalPct}%</span>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
-                  <motion.div
-                    animate={{ width: `${goalPct}%` }}
-                    transition={{ type: "spring", stiffness: 80, damping: 18 }}
-                    className="h-full rounded-full bg-gradient-warm"
-                  />
-                </div>
-              </div>
-
-              <button className="mt-5 w-full rounded-full bg-gradient-warm py-3.5 text-sm font-bold text-white shadow-warm transition-transform hover:-translate-y-0.5">
-                Donate Rs. {amount.toLocaleString()}
-              </button>
-              <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                Secure payment · Tax-deductible receipt · 92¢ goes directly to families
-              </p>
+            <div className="flex justify-center lg:justify-end">
+              <DonateAccountButton label={donate.cta || "Donate now"} className="min-w-[220px]" />
             </div>
           </div>
         </div>
@@ -1017,12 +1250,12 @@ function HomePage() {
       <About sections={sections} />
       <Values sections={sections} />
       <Impact sections={sections} />
-      <Chapters />
+      <Chapters sections={sections} />
       <Programs sections={sections} />
       <Timeline />
       <Events />
-      <Testimonials />
-      <DonateCTA />
+      <Testimonials sections={sections} />
+      <DonateCTA sections={sections} />
       <BackToTop />
     </SiteLayout>
   );

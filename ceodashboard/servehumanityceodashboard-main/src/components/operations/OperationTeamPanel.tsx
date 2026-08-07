@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Download, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx-js-style";
+import { downloadStyledAoaExcel } from "@/lib/excel-style";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,22 +50,11 @@ function exportOperationExcel(rows: OperationRecord[]) {
       r.rashanStatus || "",
     ]),
   ];
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws["!cols"] = [{ wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 16 }];
-  const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
-  for (let C = range.s.c; C <= range.e.c; C++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
-    if (cell) {
-      cell.s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "1D4ED8" } },
-        alignment: { horizontal: "center" },
-      };
-    }
-  }
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Operation");
-  XLSX.writeFile(wb, `Team-Operation-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  downloadStyledAoaExcel(
+    data,
+    "Ration Cases Status File",
+    `Ration-Cases-Status-File-${new Date().toISOString().slice(0, 10)}.xlsx`,
+  );
 }
 
 export function OperationTeamPanel() {

@@ -32,6 +32,8 @@ import websiteRoutes from "./routes/website.routes.js";
 import teamRecordRoutes from "./routes/teamRecord.routes.js";
 import chapterDonationRoutes from "./routes/chapterDonation.routes.js";
 import notificationRoutes from "./routes/notification.routes.js";
+import reviewRoutes from "./routes/review.routes.js";
+import websiteEventRoutes from "./routes/websiteEvent.routes.js";
 
 
 const app = express();
@@ -128,6 +130,8 @@ app.use(`${API}/website`, websiteRoutes);
 app.use(`${API}/team-records`, teamRecordRoutes);
 app.use(`${API}/chapter-donations`, chapterDonationRoutes);
 app.use(`${API}/notifications`, notificationRoutes);
+app.use(`${API}/reviews`, reviewRoutes);
+app.use(`${API}/website-events`, websiteEventRoutes);
 
 
 // 404 + error handler

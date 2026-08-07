@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 
 /**
  * Org / system roles:
@@ -88,6 +89,8 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date, default: null },
     passwordChangedAt: { type: Date, default: null },
+    passwordResetToken: { type: String, default: null, select: false },
+    passwordResetExpires: { type: Date, default: null, select: false },
   },
   { timestamps: true }
 );
@@ -99,6 +102,14 @@ userSchema.pre("save", async function () {
 
 userSchema.methods.matchPassword = function (plainText) {
   return bcrypt.compare(plainText, this.password);
+};
+
+/** Returns 6-digit code for email; stores hashed code + expiry (caller must save). */
+userSchema.methods.createPasswordResetToken = function () {
+  const code = String(crypto.randomInt(100000, 1000000));
+  this.passwordResetToken = crypto.createHash("sha256").update(code).digest("hex");
+  this.passwordResetExpires = new Date(Date.now() + 30 * 60 * 1000);
+  return code;
 };
 
 const User = mongoose.model("User", userSchema);

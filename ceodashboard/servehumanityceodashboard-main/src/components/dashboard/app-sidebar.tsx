@@ -28,6 +28,9 @@ import {
   Bookmark,
   Award,
   HandCoins,
+  MessageSquareText,
+  MessagesSquare,
+  Calendar,
 } from "lucide-react";
 
 import {
@@ -64,8 +67,7 @@ const MEDIA_NAV = [
 
 const OPS_NAV = [
   { title: "Verification", path: "/verification", icon: ClipboardCheck },
-  { title: "Operations", path: "/operations", icon: Boxes },
-  { title: "Media Cases", path: "/media/case-files", icon: FileSpreadsheet },
+  { title: "Ration Cases Status File", path: "/operations", icon: Boxes },
 ] as const;
 
 const items = [
@@ -81,6 +83,9 @@ const items = [
   },
   { title: "Media & Graphics", url: "/media/case-files", module: "media", icon: ImageIcon, hasMediaSub: true },
   { title: "Website", url: "/website", module: "website", icon: Globe },
+  { title: "Website Events", url: "/website-events", module: "website", icon: Calendar },
+  { title: "Reviews", url: "/reviews", module: "website", icon: MessageSquareText },
+  { title: "Contact Messages", url: "/contact-messages", module: "website", icon: MessagesSquare },
   { title: "Documentation", url: "/documentation", module: "documentation", icon: FileText, hasSub: true },
   { title: "Finance", url: "/finance", module: "finance", icon: Wallet, hasFinanceSub: true },
   { title: "Board & Governance", url: "/board", module: "board", icon: Landmark },
