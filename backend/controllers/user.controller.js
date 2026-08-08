@@ -391,15 +391,28 @@ export async function deleteUser(req, res, next) {
   try {
     const target = await User.findById(req.params.id);
     if (!target) return res.status(404).json({ success: false, message: "User not found." });
-    if (isFullAccessRole(target.systemRole)) {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot delete a full-access leadership account (CEO / Founder / CTO / COO).",
-      });
-    }
     if (String(target._id) === String(req.user._id)) {
       return res.status(400).json({ success: false, message: "Cannot delete your own account." });
     }
+
+    const actorRole = req.user.systemRole;
+    const targetRole = target.systemRole;
+    const founderMayDelete = ["ceo", "cto", "coo"];
+
+    if (isFullAccessRole(targetRole)) {
+      const allowed =
+        actorRole === "founder" && founderMayDelete.includes(targetRole);
+      if (!allowed) {
+        return res.status(403).json({
+          success: false,
+          message:
+            actorRole === "founder"
+              ? "Founder can delete CEO, CTO, and COO only — not other Founder accounts."
+              : "Cannot delete a full-access leadership account (CEO / Founder / CTO / COO).",
+        });
+      }
+    }
+
     await User.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "User deleted." });
   } catch (err) {

@@ -3,8 +3,12 @@ import Notification, {
   NOTIFICATION_PRIORITIES,
 } from "../models/Notification.js";
 import User, { CEO_DASHBOARD_ROLES } from "../models/User.js";
+import Chapter from "../models/Chapter.js";
 import { sendEmail } from "../utils/email.js";
-import { buildNotificationEmailTemplate } from "../utils/emailTemplates.js";
+import {
+  buildNotificationEmailTemplate,
+  buildWarningEmailTemplate,
+} from "../utils/emailTemplates.js";
 
 const ALL_MEMBER_ROLES = [...CEO_DASHBOARD_ROLES, "president", "member"];
 
@@ -81,7 +85,7 @@ export async function createNotification(req, res, next) {
     if (!title?.trim() || !body?.trim()) {
       return res.status(400).json({ success: false, message: "Title and body are required." });
     }
-    if (!NOTIFICATION_AUDIENCES.includes(audience)) {
+    if (!NOTIFICATION_AUDIENCES.includes(audience) || audience === "warning") {
       return res.status(400).json({
         success: false,
         message: "Invalid audience. Use bogs, bogs_presidents, or all_members.",
@@ -144,7 +148,7 @@ export async function createNotification(req, res, next) {
 
 export async function listSentNotifications(req, res, next) {
   try {
-    const items = await Notification.find()
+    const items = await Notification.find({ audience: { $ne: "warning" } })
       .sort({ createdAt: -1 })
       .limit(100)
       .populate("createdBy", "name email")
@@ -157,6 +161,156 @@ export async function listSentNotifications(req, res, next) {
       emailFailedCount: n.recipients?.filter((r) => r.emailError).length ?? 0,
       readCount: n.recipients?.filter((r) => r.readAt).length ?? 0,
     }));
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * POST /notifications/warning
+ * Send an official warning letter/email to one chapter member (User).
+ */
+export async function sendWarningMail(req, res, next) {
+  try {
+    const { chapterId, userId, title, body } = req.body || {};
+
+    if (!chapterId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Chapter and member are required.",
+      });
+    }
+    if (!body?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Warning message is required.",
+      });
+    }
+
+    const chapter = await Chapter.findById(chapterId).select("name city").lean();
+    if (!chapter) {
+      return res.status(404).json({ success: false, message: "Chapter not found." });
+    }
+
+    const member = await User.findOne({
+      _id: userId,
+      chapter: chapterId,
+    })
+      .select("_id name email chapterRole systemRole isActive")
+      .lean();
+
+    if (!member) {
+      return res.status(404).json({
+        success: false,
+        message: "Member not found in this chapter.",
+      });
+    }
+    if (!member.email?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "This member has no email address on file.",
+      });
+    }
+
+    const warningTitle = (title?.trim() || "Official Warning Letter").slice(0, 200);
+
+    const notification = await Notification.create({
+      title: warningTitle,
+      body: body.trim(),
+      audience: "warning",
+      priority: "urgent",
+      chapter: chapter._id,
+      createdBy: req.user._id,
+      recipients: [
+        {
+          user: member._id,
+          email: member.email,
+          readAt: null,
+          dismissedAt: null,
+          emailedAt: null,
+          emailError: null,
+        },
+      ],
+    });
+
+    const mail = buildWarningEmailTemplate({
+      title: warningTitle,
+      body: body.trim(),
+      recipientName: member.name,
+      chapterName: chapter.name,
+      senderName: req.user.name,
+    });
+
+    const recipient = notification.recipients[0];
+    try {
+      const result = await sendEmail({
+        to: member.email,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        attachments: mail.attachments,
+      });
+      if (result) {
+        recipient.emailedAt = new Date();
+        recipient.emailError = null;
+      } else {
+        recipient.emailError =
+          "SMTP not configured (check SMTP_USER / SMTP_PASS in backend .env)";
+      }
+    } catch (err) {
+      recipient.emailError = err?.message || "Failed to send email";
+      console.error(`Warning email failed for ${member.email}:`, recipient.emailError);
+    }
+    await notification.save();
+
+    const populated = await Notification.findById(notification._id)
+      .populate("createdBy", "name email")
+      .populate("chapter", "name city")
+      .populate("recipients.user", "name email chapterRole")
+      .lean();
+
+    res.status(201).json({
+      success: true,
+      data: populated,
+      meta: {
+        emailed: recipient.emailedAt ? 1 : 0,
+        emailFailed: recipient.emailError ? 1 : 0,
+        emailError: recipient.emailError || null,
+        recipientName: member.name,
+        recipientEmail: member.email,
+        chapterName: chapter.name,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /notifications/warning — sent warning letter history */
+export async function listWarningMails(req, res, next) {
+  try {
+    const items = await Notification.find({ audience: "warning" })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .populate("createdBy", "name email")
+      .populate("chapter", "name city")
+      .populate("recipients.user", "name email chapterRole")
+      .lean();
+
+    const data = items.map((n) => {
+      const recipient = n.recipients?.[0];
+      return {
+        ...n,
+        recipientName: recipient?.user?.name || recipient?.email || "—",
+        recipientEmail: recipient?.email || recipient?.user?.email || "",
+        recipientRole: recipient?.user?.chapterRole || "",
+        emailed: !!recipient?.emailedAt,
+        emailError: recipient?.emailError || null,
+        chapterName: n.chapter?.name || "—",
+      };
+    });
 
     res.json({ success: true, data });
   } catch (err) {

@@ -1752,7 +1752,10 @@ export function WebsiteSectionsForm({
             />
           </div>
         </Section>
-        <Section title="Social media links" description="Paste full URLs (https://...).">
+        <Section
+          title="Social media links"
+          description="Paste full URLs (https://…). WhatsApp: use https://wa.me/923XXXXXXXXX (country code + number, no + or spaces)."
+        >
           <TextInput
             label="Facebook"
             value={str(social.facebook)}
@@ -1773,6 +1776,14 @@ export function WebsiteSectionsForm({
             value={str(social.youtube)}
             onChange={(v) => patch(["social", "youtube"], v)}
           />
+          <div className="sm:col-span-2">
+            <TextInput
+              label="WhatsApp"
+              value={str(social.whatsapp)}
+              onChange={(v) => patch(["social", "whatsapp"], v)}
+              hint="Shown as WhatsApp icon in the public site footer. Example: https://wa.me/923001234567"
+            />
+          </div>
         </Section>
       </div>
     );

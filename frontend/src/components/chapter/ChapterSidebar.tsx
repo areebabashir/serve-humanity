@@ -19,11 +19,13 @@ import {
   UsersRound,
   FileSpreadsheet,
   Bell,
+  CalendarDays,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   canAccessChapterModule,
   CHAPTER_ROLE_LABEL,
+  chapterHomeForUser,
   isChapterLeadership,
   isPlainMember,
   resolveChapterRole,
@@ -52,6 +54,7 @@ const NAV: NavItem[] = [
     module: "director-donations",
   },
   { title: "Team & Roles", to: "/chapter/team", icon: ShieldCheck, module: "team" },
+  { title: "Events", to: "/chapter/events", icon: CalendarDays, module: "events" },
   { title: "Members", to: "/chapter/members", icon: Users2, module: "members" },
   { title: "Notifications", to: "/chapter/notifications", icon: Bell, module: "notifications" },
   { title: "Finance", to: "/chapter/finance", icon: Wallet, module: "finance" },
@@ -92,12 +95,12 @@ export function ChapterSidebar() {
   const visible = NAV.filter((i) => canAccessChapterModule(role, i.module));
   const opsLinks = OPS_SUB.filter((s) => canAccessChapterModule(role, s.module));
   const plain = isPlainMember(role);
-  const showOverview = !plain && canAccessChapterModule(role, "overview");
+  const dashboardHome = user ? chapterHomeForUser(user) : plain ? "/chapter/my-donation" : "/chapter";
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-white/80 backdrop-blur">
       <div className="border-b border-border px-4 py-4">
-        <Link to={plain ? "/chapter/my-donation" : "/chapter"} className="flex items-center gap-3">
+        <Link to={dashboardHome} className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-warm text-white shadow-warm">
             <HeartHandshake className="h-5 w-5" />
           </div>
@@ -109,28 +112,26 @@ export function ChapterSidebar() {
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
-        {showOverview ? (
-          <div>
-            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Chapter
-            </p>
-            <NavLink
-              to="/chapter"
-              end
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
-                  isActive
-                    ? "bg-brand-orange/10 font-semibold text-brand-orange"
-                    : "text-foreground/80 hover:bg-secondary",
-                )
-              }
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              Overview
-            </NavLink>
-          </div>
-        ) : null}
+        <div>
+          <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Chapter
+          </p>
+          <NavLink
+            to={dashboardHome}
+            end={dashboardHome === "/chapter"}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+                isActive
+                  ? "bg-brand-orange/10 font-semibold text-brand-orange"
+                  : "text-foreground/80 hover:bg-secondary",
+              )
+            }
+          >
+            <LayoutDashboard className="h-4 w-4" />
+            Go to dashboard
+          </NavLink>
+        </div>
 
         {(showOps || visible.length > 0) && (
           <div>

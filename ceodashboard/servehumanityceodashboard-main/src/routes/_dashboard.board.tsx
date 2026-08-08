@@ -76,6 +76,21 @@ const emptyForm = {
   systemRole: "bog_verification" as OrgRole,
 };
 
+/** Founder may delete CEO / CTO / COO; anyone with manage access may delete BOG seats. */
+function canDeleteMember(
+  actorRole: OrgRole | undefined,
+  target: BoardUser,
+  selfId?: string,
+) {
+  if (!actorRole || !isFullAccessRole(actorRole)) return false;
+  if (selfId && target._id === selfId) return false;
+  if (!isFullAccessRole(target.systemRole)) return true;
+  return (
+    actorRole === "founder" &&
+    (["ceo", "cto", "coo"] as OrgRole[]).includes(target.systemRole)
+  );
+}
+
 function BoardPage() {
   const { user } = useAuth();
   const canManage = isFullAccessRole(user?.systemRole);
@@ -162,7 +177,7 @@ function BoardPage() {
     setDeleting(true);
     try {
       await api(`/users/${deleteId}`, { method: "DELETE" });
-      toast.success("BOG account deleted");
+      toast.success("Account deleted");
       setDeleteId(null);
       await load();
     } catch (err) {
@@ -366,26 +381,37 @@ function BoardPage() {
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
-                      {isFullAccessRole(m.systemRole) ? (
-                        <span className="text-xs text-muted-foreground">Protected</span>
-                      ) : (
+                      {canDeleteMember(user?.systemRole as OrgRole | undefined, m, user?._id) ? (
                         <div className="flex items-center justify-end gap-3">
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={m.isActive !== false}
-                              onCheckedChange={(v) => void toggleActive(m, v)}
-                            />
-                            <span className="text-xs text-muted-foreground">Active</span>
-                          </div>
+                          {!isFullAccessRole(m.systemRole) ? (
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={m.isActive !== false}
+                                onCheckedChange={(v) => void toggleActive(m, v)}
+                              />
+                              <span className="text-xs text-muted-foreground">Active</span>
+                            </div>
+                          ) : null}
                           <Button
                             size="icon"
                             variant="ghost"
                             className="text-destructive"
                             onClick={() => setDeleteId(m._id)}
+                            title={
+                              isFullAccessRole(m.systemRole)
+                                ? `Delete ${ORG_ROLE_LABEL[m.systemRole]}`
+                                : "Delete"
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
+                      ) : isFullAccessRole(m.systemRole) ? (
+                        <span className="text-xs text-muted-foreground">
+                          {m._id === user?._id ? "You" : "Protected"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
                   )}
@@ -399,7 +425,7 @@ function BoardPage() {
       <AlertDialog open={!!deleteId} onOpenChange={(v) => !v && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete BOG account?</AlertDialogTitle>
+            <AlertDialogTitle>Delete account?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes their login. They will no longer access the CEO dashboard.
             </AlertDialogDescription>

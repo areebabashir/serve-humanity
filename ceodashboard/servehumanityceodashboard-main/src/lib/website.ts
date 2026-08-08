@@ -26,7 +26,7 @@ export const WEBSITE_PAGES = [
   },
   { key: "contact", title: "Contact", description: "Email, phone, and office details" },
   { key: "faq", title: "FAQ", description: "Common questions and answers" },
-  { key: "footer", title: "Footer", description: "Newsletter text and social links" },
+  { key: "footer", title: "Footer", description: "Newsletter text, social links, and WhatsApp" },
 ] as const;
 
 export type WebsitePageKey = (typeof WEBSITE_PAGES)[number]["key"];

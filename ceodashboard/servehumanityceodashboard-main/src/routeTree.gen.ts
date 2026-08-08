@@ -28,10 +28,12 @@ import { Route as DashboardReviewsRouteImport } from './routes/_dashboard.review
 import { Route as DashboardRolesRouteImport } from './routes/_dashboard.roles'
 import { Route as DashboardSettingsRouteImport } from './routes/_dashboard.settings'
 import { Route as DashboardVerificationRouteImport } from './routes/_dashboard.verification'
+import { Route as DashboardWarningMailRouteImport } from './routes/_dashboard.warning-mail'
 import { Route as DashboardWebsiteRouteImport } from './routes/_dashboard.website'
 import { Route as DashboardWebsiteEventsRouteImport } from './routes/_dashboard.website-events'
 import { Route as DashboardDocumentationIndexRouteImport } from './routes/_dashboard.documentation.index'
 import { Route as DashboardDocumentationDocTypeRouteImport } from './routes/_dashboard.documentation.$docType'
+import { Route as DashboardDocumentationCasesRouteImport } from './routes/_dashboard.documentation.cases'
 import { Route as DashboardDocumentationDrivesRouteImport } from './routes/_dashboard.documentation.drives'
 import { Route as DashboardDocumentationFeeRouteImport } from './routes/_dashboard.documentation.fee'
 import { Route as DashboardDocumentationHealthRouteImport } from './routes/_dashboard.documentation.health'
@@ -144,6 +146,11 @@ const DashboardVerificationRoute = DashboardVerificationRouteImport.update({
   path: '/verification',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardWarningMailRoute = DashboardWarningMailRouteImport.update({
+  id: '/warning-mail',
+  path: '/warning-mail',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardWebsiteRoute = DashboardWebsiteRouteImport.update({
   id: '/website',
   path: '/website',
@@ -164,6 +171,12 @@ const DashboardDocumentationDocTypeRoute =
   DashboardDocumentationDocTypeRouteImport.update({
     id: '/$docType',
     path: '/$docType',
+    getParentRoute: () => DashboardDocumentationRoute,
+  } as any)
+const DashboardDocumentationCasesRoute =
+  DashboardDocumentationCasesRouteImport.update({
+    id: '/cases',
+    path: '/cases',
     getParentRoute: () => DashboardDocumentationRoute,
   } as any)
 const DashboardDocumentationDrivesRoute =
@@ -278,9 +291,11 @@ export interface FileRoutesByFullPath {
   '/roles': typeof DashboardRolesRoute
   '/settings': typeof DashboardSettingsRoute
   '/verification': typeof DashboardVerificationRoute
+  '/warning-mail': typeof DashboardWarningMailRoute
   '/website': typeof DashboardWebsiteRoute
   '/website-events': typeof DashboardWebsiteEventsRoute
   '/documentation/$docType': typeof DashboardDocumentationDocTypeRoute
+  '/documentation/cases': typeof DashboardDocumentationCasesRoute
   '/documentation/drives': typeof DashboardDocumentationDrivesRoute
   '/documentation/fee': typeof DashboardDocumentationFeeRoute
   '/documentation/health': typeof DashboardDocumentationHealthRoute
@@ -314,10 +329,12 @@ export interface FileRoutesByTo {
   '/roles': typeof DashboardRolesRoute
   '/settings': typeof DashboardSettingsRoute
   '/verification': typeof DashboardVerificationRoute
+  '/warning-mail': typeof DashboardWarningMailRoute
   '/website': typeof DashboardWebsiteRoute
   '/website-events': typeof DashboardWebsiteEventsRoute
   '/': typeof DashboardIndexRoute
   '/documentation/$docType': typeof DashboardDocumentationDocTypeRoute
+  '/documentation/cases': typeof DashboardDocumentationCasesRoute
   '/documentation/drives': typeof DashboardDocumentationDrivesRoute
   '/documentation/fee': typeof DashboardDocumentationFeeRoute
   '/documentation/health': typeof DashboardDocumentationHealthRoute
@@ -356,10 +373,12 @@ export interface FileRoutesById {
   '/_dashboard/roles': typeof DashboardRolesRoute
   '/_dashboard/settings': typeof DashboardSettingsRoute
   '/_dashboard/verification': typeof DashboardVerificationRoute
+  '/_dashboard/warning-mail': typeof DashboardWarningMailRoute
   '/_dashboard/website': typeof DashboardWebsiteRoute
   '/_dashboard/website-events': typeof DashboardWebsiteEventsRoute
   '/_dashboard/': typeof DashboardIndexRoute
   '/_dashboard/documentation/$docType': typeof DashboardDocumentationDocTypeRoute
+  '/_dashboard/documentation/cases': typeof DashboardDocumentationCasesRoute
   '/_dashboard/documentation/drives': typeof DashboardDocumentationDrivesRoute
   '/_dashboard/documentation/fee': typeof DashboardDocumentationFeeRoute
   '/_dashboard/documentation/health': typeof DashboardDocumentationHealthRoute
@@ -399,9 +418,11 @@ export interface FileRouteTypes {
     | '/roles'
     | '/settings'
     | '/verification'
+    | '/warning-mail'
     | '/website'
     | '/website-events'
     | '/documentation/$docType'
+    | '/documentation/cases'
     | '/documentation/drives'
     | '/documentation/fee'
     | '/documentation/health'
@@ -435,10 +456,12 @@ export interface FileRouteTypes {
     | '/roles'
     | '/settings'
     | '/verification'
+    | '/warning-mail'
     | '/website'
     | '/website-events'
     | '/'
     | '/documentation/$docType'
+    | '/documentation/cases'
     | '/documentation/drives'
     | '/documentation/fee'
     | '/documentation/health'
@@ -476,10 +499,12 @@ export interface FileRouteTypes {
     | '/_dashboard/roles'
     | '/_dashboard/settings'
     | '/_dashboard/verification'
+    | '/_dashboard/warning-mail'
     | '/_dashboard/website'
     | '/_dashboard/website-events'
     | '/_dashboard/'
     | '/_dashboard/documentation/$docType'
+    | '/_dashboard/documentation/cases'
     | '/_dashboard/documentation/drives'
     | '/_dashboard/documentation/fee'
     | '/_dashboard/documentation/health'
@@ -641,6 +666,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardVerificationRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/warning-mail': {
+      id: '/_dashboard/warning-mail'
+      path: '/warning-mail'
+      fullPath: '/warning-mail'
+      preLoaderRoute: typeof DashboardWarningMailRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/website': {
       id: '/_dashboard/website'
       path: '/website'
@@ -667,6 +699,13 @@ declare module '@tanstack/react-router' {
       path: '/$docType'
       fullPath: '/documentation/$docType'
       preLoaderRoute: typeof DashboardDocumentationDocTypeRouteImport
+      parentRoute: typeof DashboardDocumentationRoute
+    }
+    '/_dashboard/documentation/cases': {
+      id: '/_dashboard/documentation/cases'
+      path: '/cases'
+      fullPath: '/documentation/cases'
+      preLoaderRoute: typeof DashboardDocumentationCasesRouteImport
       parentRoute: typeof DashboardDocumentationRoute
     }
     '/_dashboard/documentation/drives': {
@@ -786,6 +825,7 @@ declare module '@tanstack/react-router' {
 
 interface DashboardDocumentationRouteChildren {
   DashboardDocumentationDocTypeRoute: typeof DashboardDocumentationDocTypeRoute
+  DashboardDocumentationCasesRoute: typeof DashboardDocumentationCasesRoute
   DashboardDocumentationDrivesRoute: typeof DashboardDocumentationDrivesRoute
   DashboardDocumentationFeeRoute: typeof DashboardDocumentationFeeRoute
   DashboardDocumentationHealthRoute: typeof DashboardDocumentationHealthRoute
@@ -801,6 +841,7 @@ interface DashboardDocumentationRouteChildren {
 const DashboardDocumentationRouteChildren: DashboardDocumentationRouteChildren =
   {
     DashboardDocumentationDocTypeRoute: DashboardDocumentationDocTypeRoute,
+    DashboardDocumentationCasesRoute: DashboardDocumentationCasesRoute,
     DashboardDocumentationDrivesRoute: DashboardDocumentationDrivesRoute,
     DashboardDocumentationFeeRoute: DashboardDocumentationFeeRoute,
     DashboardDocumentationHealthRoute: DashboardDocumentationHealthRoute,
@@ -870,6 +911,7 @@ interface DashboardRouteChildren {
   DashboardRolesRoute: typeof DashboardRolesRoute
   DashboardSettingsRoute: typeof DashboardSettingsRoute
   DashboardVerificationRoute: typeof DashboardVerificationRoute
+  DashboardWarningMailRoute: typeof DashboardWarningMailRoute
   DashboardWebsiteRoute: typeof DashboardWebsiteRoute
   DashboardWebsiteEventsRoute: typeof DashboardWebsiteEventsRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
@@ -890,6 +932,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardRolesRoute: DashboardRolesRoute,
   DashboardSettingsRoute: DashboardSettingsRoute,
   DashboardVerificationRoute: DashboardVerificationRoute,
+  DashboardWarningMailRoute: DashboardWarningMailRoute,
   DashboardWebsiteRoute: DashboardWebsiteRoute,
   DashboardWebsiteEventsRoute: DashboardWebsiteEventsRoute,
   DashboardIndexRoute: DashboardIndexRoute,

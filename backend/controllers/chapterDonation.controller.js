@@ -1,4 +1,5 @@
 import ChapterTeamDonation from "../models/ChapterTeamDonation.js";
+import Chapter from "../models/Chapter.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
 import { uploadToCloudinary } from "../middleware/upload.js";
@@ -470,11 +471,24 @@ export async function verifyChapterDonation(req, res, next) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
+    const prevStatus = doc.status;
     const status = req.body.status === "rejected" ? "rejected" : "verified";
     doc.status = status;
     doc.verifiedBy = req.user._id;
     doc.verifiedAt = new Date();
     await doc.save();
+
+    // Keep Chapter.fundsRaised in sync with verified team donations.
+    if (prevStatus !== "verified" && status === "verified") {
+      await Chapter.findByIdAndUpdate(doc.chapter, {
+        $inc: { fundsRaised: doc.amount || 0 },
+        $set: { lastActivity: new Date() },
+      });
+    } else if (prevStatus === "verified" && status === "rejected") {
+      await Chapter.findByIdAndUpdate(doc.chapter, {
+        $inc: { fundsRaised: -(doc.amount || 0) },
+      });
+    }
 
     const populated = await ChapterTeamDonation.findById(doc._id)
       .populate("donor", "name email")

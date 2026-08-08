@@ -5,6 +5,7 @@ import {
   Building2,
   ShieldCheck,
   ClipboardCheck,
+  ClipboardList,
   Boxes,
   Image as ImageIcon,
   Globe,
@@ -32,6 +33,7 @@ import {
   MessagesSquare,
   Calendar,
   Mail,
+  AlertTriangle,
 } from "lucide-react";
 
 import {
@@ -62,7 +64,7 @@ import { DOC_NAV, type DocNavItem } from "@/lib/documentation";
 import { FINANCE_NAV, type FinanceNavItem } from "@/lib/finance";
 
 const MEDIA_NAV = [
-  { title: "Case Files", path: "/media/case-files", icon: FileSpreadsheet },
+  { title: "Ref File", path: "/media/case-files", icon: FileSpreadsheet },
   { title: "Certificate Generator", path: "/media/certificate-generator", icon: Award },
 ] as const;
 
@@ -93,11 +95,13 @@ const items = [
   { title: "Board & Governance", url: "/board", module: "board", icon: Landmark },
   { title: "Reports & Analytics", url: "/reports", module: "reports", icon: BarChart3 },
   { title: "Notifications", url: "/notifications", module: "notifications", icon: Bell },
+  { title: "Warning Mail", url: "/warning-mail", module: "warning-mail", icon: AlertTriangle, fullAccessOnly: true },
   { title: "Settings", url: "/settings", module: "settings", icon: Settings },
 ];
 
 const DOC_ICONS: Record<DocNavItem["type"], typeof FileText> = {
   hub: FolderOpen,
+  cases: ClipboardList,
   health: HeartPulse,
   marriage: Heart,
   fee: GraduationCap,
@@ -163,7 +167,11 @@ export function AppSidebar() {
 
   const isActive = (url: string) =>
     url === "/" ? pathname === "/" : pathname === url || pathname.startsWith(url + "/");
-  const visibleItems = items.filter((item) => canAccessModule(role, item.module));
+  const visibleItems = items.filter((item) => {
+    if (!canAccessModule(role, item.module)) return false;
+    if ("fullAccessOnly" in item && item.fullAccessOnly && !isFullAccessRole(role)) return false;
+    return true;
+  });
   const showDocs = canAccessModule(role, "documentation");
   const showMedia = canAccessModule(role, "media");
   const showFinance = canAccessModule(role, "finance");

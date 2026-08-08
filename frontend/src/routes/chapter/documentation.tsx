@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DocumentationTypePage } from "@/components/documentation/DocumentationTypePage";
+import { DocumentationCasesBoard } from "@/components/documentation/DocumentationCasesBoard";
 import { ChapterCard } from "@/components/chapter/ChapterPage";
 import type { ChapterScope } from "@/components/finance/FinanceDonationPage";
 import { cn } from "@/lib/utils";
@@ -8,7 +9,7 @@ import { DOC_NAV, type DocType } from "@/lib/documentation";
 import { chapterIdFromUser } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
-const DOC_TYPES = DOC_NAV.filter((item): item is typeof item & { type: DocType } => item.type !== "hub");
+const DOC_TYPES = DOC_NAV.filter((item): item is typeof item & { type: DocType } => item.type !== "hub" && item.type !== "cases");
 
 function chapterScopeFromUser(user: ReturnType<typeof useAuth>["user"]): ChapterScope | null {
   const chapterId = chapterIdFromUser(user);
@@ -28,6 +29,8 @@ export default function ChapterDocumentationPage() {
   const { user } = useAuth();
   const scope = chapterScopeFromUser(user);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const viewCases = searchParams.get("view") === "cases" || !searchParams.get("type");
 
   const selectedType = useMemo(() => {
     const fromQuery = searchParams.get("type");
@@ -50,6 +53,25 @@ export default function ChapterDocumentationPage() {
   return (
     <div className="space-y-4">
       <nav className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete("type");
+              next.set("view", "cases");
+              return next;
+            })
+          }
+          className={cn(
+            "rounded-full border px-3 py-1.5 text-xs font-medium transition",
+            viewCases
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-card text-muted-foreground hover:text-foreground",
+          )}
+        >
+          All Cases
+        </button>
         {DOC_TYPES.map((item) => (
           <button
             key={item.type}
@@ -57,13 +79,14 @@ export default function ChapterDocumentationPage() {
             onClick={() =>
               setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
+                next.delete("view");
                 next.set("type", item.type);
                 return next;
               })
             }
             className={cn(
               "rounded-full border px-3 py-1.5 text-xs font-medium transition",
-              selectedType === item.type
+              !viewCases && selectedType === item.type
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card text-muted-foreground hover:text-foreground",
             )}
@@ -73,11 +96,15 @@ export default function ChapterDocumentationPage() {
         ))}
       </nav>
 
-      <DocumentationTypePage
-        type={activeNav.type}
-        description={activeNav.description}
-        scope={scope}
-      />
+      {viewCases ? (
+        <DocumentationCasesBoard />
+      ) : (
+        <DocumentationTypePage
+          type={activeNav.type}
+          description={activeNav.description}
+          scope={scope}
+        />
+      )}
     </div>
   );
 }

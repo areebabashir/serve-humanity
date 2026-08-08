@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const NOTIFICATION_AUDIENCES = ["bogs", "bogs_presidents", "all_members"];
+export const NOTIFICATION_AUDIENCES = ["bogs", "bogs_presidents", "all_members", "warning"];
 export const NOTIFICATION_PRIORITIES = ["normal", "high", "urgent"];
 
 const recipientSchema = new mongoose.Schema(
@@ -30,6 +30,8 @@ const notificationSchema = new mongoose.Schema(
       enum: NOTIFICATION_AUDIENCES,
       required: true,
     },
+    /** Set for single-member warning letters (chapter context). */
+    chapter: { type: mongoose.Schema.Types.ObjectId, ref: "Chapter", default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     expiresAt: { type: Date, default: null },
     recipients: { type: [recipientSchema], default: [] },

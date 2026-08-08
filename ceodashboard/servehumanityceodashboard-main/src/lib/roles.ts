@@ -18,7 +18,7 @@ export type OrgRole =
 export const ORG_ROLE_LABEL: Record<OrgRole, string> = {
   ceo: "Chief Executive",
   founder: "Founder",
-  cto: "Chief Technology Officer",
+  cto: "Chief Technician Officer",
   coo: "Chief Operating Officer",
   bog_verification: "BOG — Verification",
   bog_operations: "BOG — Operations",

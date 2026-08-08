@@ -16,7 +16,7 @@ const router = Router();
 /** Public read (main website) */
 router.get("/public", getPublicWebsite);
 
-/** Admin (CEO + bog_media) */
+/** Admin (CEO / Founder / CTO / COO + bog_media) */
 router.use(protect);
 router.get("/", listWebsitePages);
 router.post("/seed", seedWebsiteDefaults);

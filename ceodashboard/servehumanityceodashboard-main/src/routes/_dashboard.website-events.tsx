@@ -31,6 +31,7 @@ type WebsiteEventRow = {
   capacity?: string;
   description?: string;
   published?: boolean;
+  chapter?: { _id: string; name?: string; city?: string } | null;
 };
 
 type RegistrationRow = {
@@ -202,6 +203,11 @@ function WebsiteEventsPage() {
                   <Badge variant={row.published !== false ? "default" : "secondary"}>
                     {row.published !== false ? "Published" : "Draft"}
                   </Badge>
+                  {row.chapter?.name ? (
+                    <Badge variant="outline">{row.chapter.name}</Badge>
+                  ) : (
+                    <Badge variant="outline">Org-wide</Badge>
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {new Date(row.date).toLocaleDateString()} · {row.location}

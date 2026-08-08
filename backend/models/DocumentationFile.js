@@ -60,6 +60,13 @@ const documentationFileSchema = new mongoose.Schema(
       enum: ["draft", "submitted", "reviewed", "archived"],
       default: "draft",
     },
+    /** Case board lifecycle for health / marriage / fee / ration */
+    caseStatus: {
+      type: String,
+      enum: ["pending", "running", "complete"],
+      default: "pending",
+      index: true,
+    },
     /** Filled-form PDF synced to Google Drive (avoid duplicates) */
     pdfDriveFileId: { type: String, default: "" },
     pdfDriveWebViewLink: { type: String, default: "" },

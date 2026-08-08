@@ -376,6 +376,7 @@ export const DEFAULT_WEBSITE_CONTENT = {
       instagram: "#",
       twitter: "#",
       youtube: "#",
+      whatsapp: "",
     },
   },
 };

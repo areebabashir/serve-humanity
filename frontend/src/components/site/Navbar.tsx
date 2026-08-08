@@ -1,9 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { Menu, X, Heart } from "lucide-react";
+import { Menu, X, Heart, LayoutDashboard } from "lucide-react";
 import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { chapterHomeForUser, isChapterAppUser } from "@/lib/chapterRoles";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -15,11 +16,33 @@ const NAV = [
   { to: "/contact", label: "Contact" },
 ] as const;
 
+const CEO_DASHBOARD_URL = import.meta.env.VITE_CEO_DASHBOARD_URL || "http://localhost:5174";
+
+const CEO_BOARD_ROLES = new Set([
+  "ceo",
+  "founder",
+  "cto",
+  "coo",
+  "bog_verification",
+  "bog_operations",
+  "bog_media",
+  "bog_finance",
+  "bog_documentation",
+]);
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const { user, logout } = useAuth();
+
+  const chapterUser = !!(user && isChapterAppUser(user.systemRole));
+  const ceoUser = !!(user && CEO_BOARD_ROLES.has(user.systemRole));
+  const dashboardHref = chapterUser
+    ? chapterHomeForUser(user!)
+    : ceoUser
+      ? CEO_DASHBOARD_URL
+      : null;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -73,6 +96,25 @@ export function Navbar() {
           </ul>
 
           <div className="flex items-center gap-2">
+            {dashboardHref ? (
+              chapterUser ? (
+                <Link
+                  to={dashboardHref}
+                  className="hidden items-center gap-1.5 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3.5 py-1.5 text-[13px] font-semibold text-brand-blue transition hover:bg-brand-blue/15 md:inline-flex"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  Go to dashboard
+                </Link>
+              ) : (
+                <a
+                  href={dashboardHref}
+                  className="hidden items-center gap-1.5 rounded-full border border-brand-blue/20 bg-brand-blue/10 px-3.5 py-1.5 text-[13px] font-semibold text-brand-blue transition hover:bg-brand-blue/15 md:inline-flex"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  Go to dashboard
+                </a>
+              )
+            ) : null}
             {user ? (
               <button
                 type="button"
@@ -120,6 +162,27 @@ export function Navbar() {
                   </Link>
                 </li>
               ))}
+              {dashboardHref ? (
+                <li>
+                  {chapterUser ? (
+                    <Link
+                      to={dashboardHref}
+                      className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue/10"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      Go to dashboard
+                    </Link>
+                  ) : (
+                    <a
+                      href={dashboardHref}
+                      className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue/10"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      Go to dashboard
+                    </a>
+                  )}
+                </li>
+              ) : null}
               <li className="mt-2 flex gap-2 border-t border-border pt-3">
                 {user ? (
                   <button

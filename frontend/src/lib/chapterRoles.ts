@@ -77,6 +77,7 @@ const LEADERSHIP_MODULES = [
   "my-donation",
   "director-donations",
   "team",
+  "events",
   "finance",
   "ops",
   "verification",

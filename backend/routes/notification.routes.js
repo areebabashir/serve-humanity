@@ -9,6 +9,8 @@ import {
   dismissFromInbox,
   deleteSentNotification,
   clearSentHistory,
+  sendWarningMail,
+  listWarningMails,
 } from "../controllers/notification.controller.js";
 
 const router = Router();
@@ -20,6 +22,9 @@ router.get("/inbox", getInbox);
 router.get("/unread-count", getUnreadCount);
 router.patch("/:id/read", markRead);
 router.delete("/:id/inbox", dismissFromInbox);
+
+router.post("/warning", requireFullAccess, sendWarningMail);
+router.get("/warning", requireFullAccess, listWarningMails);
 
 router.post("/", requireFullAccess, createNotification);
 router.get("/", requireFullAccess, listSentNotifications);

@@ -4,6 +4,10 @@ import { uploadDocumentationToDrive, googleDriveConfigured } from "../utils/goog
 
 const DOC_BOG = new Set(["ceo", "bog_documentation"]);
 
+/** Regular case files managed on the Pending / Running / Complete board */
+export const CASE_DOC_TYPES = ["health", "marriage", "fee", "ration"];
+export const CASE_STATUSES = ["pending", "running", "complete"];
+
 function chapterIdOf(user) {
   if (!user?.chapter) return null;
   return user.chapter._id || user.chapter;
@@ -25,16 +29,31 @@ function sameChapter(user, docChapter) {
 
 export async function listDocs(req, res, next) {
   try {
-    const { type, chapter, status, page = 1, limit = 30, q } = req.query;
+    const { type, chapter, status, caseStatus, casesOnly, page = 1, limit = 30, q } = req.query;
     const filter = applyChapterScope({}, req.user);
-    if (type) filter.type = type;
+    if (type) {
+      filter.type = type;
+    } else if (casesOnly === "1" || casesOnly === "true" || caseStatus) {
+      filter.type = { $in: CASE_DOC_TYPES };
+    }
     if (chapter && DOC_BOG.has(req.user.systemRole)) filter.chapter = chapter;
+    if (caseStatus && CASE_STATUSES.includes(String(caseStatus))) {
+      if (caseStatus === "pending") {
+        filter.$and = [
+          ...(filter.$and || []),
+          { $or: [{ caseStatus: "pending" }, { caseStatus: { $exists: false } }, { caseStatus: null }] },
+        ];
+      } else {
+        filter.caseStatus = caseStatus;
+      }
+    }
     if (status) filter.status = status;
     if (q) {
       filter.$or = [
         { caseNumber: new RegExp(q, "i") },
         { title: new RegExp(q, "i") },
         { notes: new RegExp(q, "i") },
+        { "fields.beneficiaryName": new RegExp(q, "i") },
       ];
     }
 
@@ -46,7 +65,7 @@ export async function listDocs(req, res, next) {
         .populate("chapter", "name city")
         .populate("createdBy", "name email")
         .populate("updatedBy", "name email")
-        .sort({ createdAt: -1 }),
+        .sort({ updatedAt: -1 }),
       DocumentationFile.countDocuments(filter),
     ]);
 
@@ -74,7 +93,7 @@ export async function getDoc(req, res, next) {
 
 export async function createDoc(req, res, next) {
   try {
-    const { type, title, caseNumber, chapter, fields, attachments, notes, status } = req.body;
+    const { type, title, caseNumber, chapter, fields, attachments, notes, status, caseStatus } = req.body;
     if (!type || !DOC_TYPES.includes(type)) {
       return res.status(400).json({ success: false, message: "Valid document type is required." });
     }
@@ -90,6 +109,14 @@ export async function createDoc(req, res, next) {
       }
     }
 
+    const isCaseType = CASE_DOC_TYPES.includes(type);
+    const resolvedCaseStatus =
+      caseStatus && CASE_STATUSES.includes(caseStatus)
+        ? caseStatus
+        : isCaseType
+          ? "pending"
+          : undefined;
+
     const doc = await DocumentationFile.create({
       type,
       title: title || "",
@@ -99,6 +126,7 @@ export async function createDoc(req, res, next) {
       attachments: attachments || [],
       notes: notes || "",
       status: status || "draft",
+      ...(resolvedCaseStatus ? { caseStatus: resolvedCaseStatus } : {}),
       createdBy: req.user._id,
       updatedBy: req.user._id,
     });
@@ -121,10 +149,16 @@ export async function updateDoc(req, res, next) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
-    const allowed = ["title", "caseNumber", "chapter", "fields", "attachments", "notes", "status"];
+    const allowed = ["title", "caseNumber", "chapter", "fields", "attachments", "notes", "status", "caseStatus"];
     const updates = { updatedBy: req.user._id };
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    if (updates.caseStatus && !CASE_STATUSES.includes(updates.caseStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "caseStatus must be pending, running, or complete.",
+      });
     }
     if (!DOC_BOG.has(req.user.systemRole)) {
       updates.chapter = chapterIdOf(req.user);

@@ -27,6 +27,7 @@ type PublicEvent = {
   location: string;
   days: number;
   capacity: string;
+  chapterName?: string;
 };
 
 export default function Page() {
@@ -111,7 +112,8 @@ export default function Page() {
             </div>
           ) : events.length === 0 ? (
             <p className="rounded-3xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-              No events published yet. Add some from the CEO dashboard under Website Events.
+              No events published yet. Leadership can add them from Website Events, or chapter
+              presidents from their chapter Events page.
             </p>
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -124,6 +126,9 @@ export default function Page() {
                         <Calendar className="h-3.5 w-3.5" /> {e.date}
                       </div>
                       <h3 className="mt-3 font-display text-xl font-bold">{e.title}</h3>
+                      {e.chapterName ? (
+                        <p className="mt-1 text-xs font-medium text-brand-blue">{e.chapterName} chapter</p>
+                      ) : null}
                       <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                         <MapPin className="h-3.5 w-3.5" /> {e.location}
                       </p>
@@ -182,6 +187,7 @@ export default function Page() {
             </DialogTitle>
             <DialogDescription>
               {active?.date} · {active?.location}
+              {active?.chapterName ? ` · ${active.chapterName}` : ""}
             </DialogDescription>
           </DialogHeader>
           {doneMsg ? (

@@ -14,7 +14,7 @@ export type DocType =
   | "reference";
 
 export interface DocNavItem {
-  type: DocType | "hub";
+  type: DocType | "hub" | "cases";
   title: string;
   path: string;
   description: string;
@@ -26,6 +26,12 @@ export const DOC_NAV: DocNavItem[] = [
     title: "Overview",
     path: "/documentation",
     description: "All chapter documentation at a glance",
+  },
+  {
+    type: "cases",
+    title: "All Cases",
+    path: "/documentation/cases",
+    description: "Health, marriage, fee & ration — Pending / Running / Complete",
   },
   {
     type: "health",

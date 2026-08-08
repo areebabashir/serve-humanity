@@ -177,6 +177,138 @@ export function buildNotificationEmailTemplate({ title, body, priority = "normal
 }
 
 /**
+ * Official warning letter email to a chapter member.
+ */
+export function buildWarningEmailTemplate({
+  title = "Official Warning Letter",
+  body,
+  recipientName,
+  chapterName,
+  senderName,
+}) {
+  const safeTitle = escapeHtml(title);
+  const safeBody = escapeHtml(body).replace(/\n/g, "<br/>");
+  const safeName = recipientName ? escapeHtml(recipientName) : "";
+  const safeChapter = chapterName ? escapeHtml(chapterName) : "";
+  const safeSender = senderName ? escapeHtml(senderName) : "Serve Humanity Leadership";
+  const greeting = safeName ? `Assalamu Alaikum, ${safeName}` : "Assalamu Alaikum";
+  const year = new Date().getFullYear();
+  const issued = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${safeTitle}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:${BRAND.ink}">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:28px 12px">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid ${BRAND.border};box-shadow:0 8px 24px rgba(35,74,143,0.08)">
+          <tr>
+            <td style="background:linear-gradient(135deg, ${BRAND.blue} 0%, #1a3568 55%, #b91c1c 100%);padding:22px 28px">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="72" valign="middle">${logoImgHtml()}</td>
+                  <td valign="middle" style="padding-left:14px">
+                    <div style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:0.01em;line-height:1.2">Serve Humanity</div>
+                    <div style="color:rgba(255,255,255,0.85);font-size:12px;margin-top:4px">Official Warning Letter</div>
+                  </td>
+                  <td align="right" valign="middle">
+                    <span style="display:inline-block;padding:4px 10px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:700;letter-spacing:.04em">WARNING</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="height:4px;background:linear-gradient(90deg, #b91c1c, ${BRAND.orange}, ${BRAND.blue});font-size:0;line-height:0">&nbsp;</td>
+          </tr>
+          <tr>
+            <td style="padding:28px 28px 8px">
+              <p style="margin:0 0 6px;font-size:12px;color:${BRAND.muted}">Date: ${escapeHtml(issued)}</p>
+              ${safeChapter ? `<p style="margin:0 0 16px;font-size:12px;color:${BRAND.muted}">Chapter: <strong style="color:${BRAND.ink}">${safeChapter}</strong></p>` : ""}
+              <p style="margin:0 0 16px;font-size:14px;color:${BRAND.muted}">${greeting},</p>
+              <h1 style="margin:0 0 14px;font-size:22px;line-height:1.3;color:#b91c1c;font-weight:700">${safeTitle}</h1>
+              <p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:${BRAND.ink}">
+                This is an official warning from Serve Humanity leadership regarding your conduct / performance as a chapter member. Please read carefully.
+              </p>
+              <div style="background:#fef2f2;border-left:4px solid #b91c1c;border-radius:0 12px 12px 0;padding:16px 18px">
+                <p style="margin:0;font-size:15px;line-height:1.65;color:${BRAND.ink}">${safeBody}</p>
+              </div>
+              <p style="margin:18px 0 0;font-size:14px;line-height:1.6;color:${BRAND.ink}">
+                You are expected to take corrective action immediately. Further violations may result in additional disciplinary measures, including suspension from chapter duties.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 28px 8px">
+              <p style="margin:0;font-size:13px;color:${BRAND.muted};line-height:1.5">
+                Issued by: <strong style="color:${BRAND.ink}">${safeSender}</strong><br/>
+                This message was sent by Serve Humanity leadership. Please contact your chapter president or leadership if you have questions.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 28px 28px">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${BRAND.border};padding-top:18px">
+                <tr>
+                  <td>
+                    <div style="font-size:13px;font-weight:600;color:${BRAND.blue}">Serve Humanity</div>
+                    <div style="font-size:12px;color:${BRAND.muted};margin-top:4px">Serving with compassion · Together for humanity</div>
+                    <div style="font-size:11px;color:#9ca3af;margin-top:12px">&copy; ${year} Serve Humanity. All rights reserved.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    "Serve Humanity — Official Warning Letter",
+    "",
+    `Date: ${issued}`,
+    chapterName ? `Chapter: ${chapterName}` : "",
+    "",
+    greeting + ",",
+    "",
+    title,
+    "",
+    body,
+    "",
+    "You are expected to take corrective action immediately.",
+    "",
+    `Issued by: ${senderName || "Serve Humanity Leadership"}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const attachments = [];
+  const logo = getEmailLogoAttachment();
+  if (logo && !process.env.LOGO_URL && !process.env.EMAIL_LOGO_URL) {
+    attachments.push(logo);
+  }
+
+  return {
+    subject: `[Warning] ${title}`,
+    html,
+    text,
+    attachments,
+  };
+}
+
+/**
  * Password reset email with branded layout + verification code.
  */
 export function buildPasswordResetEmail({ name, code, expiresMinutes = 30 }) {

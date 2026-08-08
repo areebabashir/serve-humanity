@@ -44,7 +44,13 @@ function DocsHubPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
-            const count = stats[item.type as DocType] ?? 0;
+            const count =
+              item.type === "cases"
+                ? (stats.health || 0) +
+                  (stats.marriage || 0) +
+                  (stats.fee || 0) +
+                  (stats.ration || 0)
+                : stats[item.type as DocType] ?? 0;
             return (
               <Link
                 key={item.path}

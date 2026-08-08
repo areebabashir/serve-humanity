@@ -2,7 +2,7 @@ import SiteContent, { WEBSITE_PAGES } from "../models/SiteContent.js";
 import { DEFAULT_WEBSITE_CONTENT } from "../data/websiteDefaults.js";
 import { uploadToCloudinary } from "../middleware/upload.js";
 
-const WEBSITE_EDITORS = new Set(["ceo", "bog_media"]);
+const WEBSITE_EDITORS = new Set(["ceo", "founder", "cto", "coo", "bog_media"]);
 
 function canEditWebsite(user) {
   return WEBSITE_EDITORS.has(user?.systemRole);
@@ -26,6 +26,14 @@ function withDefaultSections(page, sections) {
   }
   const defaults = DEFAULT_WEBSITE_CONTENT[page] || {};
   const remote = sections && typeof sections === "object" ? sections : {};
+  if (page === "footer") {
+    const merged = { ...defaults, ...remote };
+    const dSocial =
+      defaults.social && typeof defaults.social === "object" ? defaults.social : {};
+    const rSocial = remote.social && typeof remote.social === "object" ? remote.social : {};
+    merged.social = { ...dSocial, ...rSocial };
+    return merged;
+  }
   if (page !== "about") {
     return { ...defaults, ...remote };
   }

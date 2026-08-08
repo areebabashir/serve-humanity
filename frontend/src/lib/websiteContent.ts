@@ -359,6 +359,7 @@ export const LOCAL_WEBSITE_DEFAULTS: Record<string, Record<string, unknown>> = {
       instagram: "#",
       twitter: "#",
       youtube: "#",
+      whatsapp: "",
     },
   },
 };
@@ -384,7 +385,21 @@ function mergeSections(
   remote?: Record<string, unknown> | null,
 ): Record<string, unknown> {
   if (!remote || typeof remote !== "object") return fallback;
-  return { ...fallback, ...remote };
+  const merged = { ...fallback, ...remote };
+  // Keep nested social keys (e.g. whatsapp) when DB footer was saved before that field existed
+  const fbSocial = fallback.social;
+  const remSocial = remote.social;
+  if (
+    fbSocial &&
+    typeof fbSocial === "object" &&
+    !Array.isArray(fbSocial) &&
+    remSocial &&
+    typeof remSocial === "object" &&
+    !Array.isArray(remSocial)
+  ) {
+    merged.social = { ...(fbSocial as object), ...(remSocial as object) };
+  }
+  return merged;
 }
 
 /** Fetch one published page. Set `dbOnly` to skip local dummy defaults (use CMS/DB only). */

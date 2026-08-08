@@ -10,14 +10,78 @@ import { uploadToCloudinary } from "../middleware/upload.js";
 
 const PRESIDENT_FIELDS = "name email phone avatar systemRole chapterRole lastLogin isActive";
 
+async function fundsRaisedByChapterIds() {
+  const [teamFundsByChapter, publicFundsByChapter] = await Promise.all([
+    ChapterTeamDonation.aggregate([
+      { $match: { status: { $in: ["verified", "pending"] } } },
+      { $group: { _id: "$chapter", total: { $sum: "$amount" } } },
+    ]),
+    Donation.aggregate([
+      {
+        $match: {
+          status: { $in: ["confirmed", "pending"] },
+          chapter: { $ne: null },
+        },
+      },
+      { $group: { _id: "$chapter", total: { $sum: "$amount" } } },
+    ]),
+  ]);
+  const map = new Map();
+  for (const r of teamFundsByChapter || []) {
+    map.set(String(r._id), (map.get(String(r._id)) || 0) + (r.total || 0));
+  }
+  for (const r of publicFundsByChapter || []) {
+    map.set(String(r._id), (map.get(String(r._id)) || 0) + (r.total || 0));
+  }
+  return map;
+}
+
+async function liveFundsForChapter(chapterId) {
+  const oid =
+    chapterId instanceof mongoose.Types.ObjectId
+      ? chapterId
+      : new mongoose.Types.ObjectId(String(chapterId));
+  const [teamRows, publicRows] = await Promise.all([
+    ChapterTeamDonation.aggregate([
+      {
+        $match: {
+          chapter: oid,
+          status: { $in: ["verified", "pending"] },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    Donation.aggregate([
+      {
+        $match: {
+          chapter: oid,
+          status: { $in: ["confirmed", "pending"] },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+  ]);
+  return (teamRows[0]?.total || 0) + (publicRows[0]?.total || 0);
+}
+
+function resolveFundsRaised(chapterId, stored, liveMap) {
+  const live = liveMap.get(String(chapterId)) || 0;
+  return live > 0 ? live : stored ?? 0;
+}
+
 export async function getAllChapters(req, res, next) {
   try {
     const { status } = req.query;
     const filter = status ? { status } : {};
-    const chapters = await Chapter.find(filter)
-      .populate("president", PRESIDENT_FIELDS)
-      .sort({ name: 1 });
-    res.json({ success: true, total: chapters.length, data: chapters });
+    const [chapters, liveMap] = await Promise.all([
+      Chapter.find(filter).populate("president", PRESIDENT_FIELDS).sort({ name: 1 }).lean(),
+      fundsRaisedByChapterIds(),
+    ]);
+    const data = chapters.map((c) => ({
+      ...c,
+      fundsRaised: resolveFundsRaised(c._id, c.fundsRaised, liveMap),
+    }));
+    res.json({ success: true, total: data.length, data });
   } catch (err) {
     next(err);
   }
@@ -26,10 +90,13 @@ export async function getAllChapters(req, res, next) {
 /** Public website listing — active chapters only, display fields. */
 export async function getPublicChapters(req, res, next) {
   try {
-    const chapters = await Chapter.find({ status: "active" })
-      .populate("president", "name")
-      .sort({ city: 1, name: 1 })
-      .lean();
+    const [chapters, liveMap] = await Promise.all([
+      Chapter.find({ status: "active" })
+        .populate("president", "name")
+        .sort({ city: 1, name: 1 })
+        .lean(),
+      fundsRaisedByChapterIds(),
+    ]);
 
     const data = chapters.map((c) => ({
       id: String(c._id),
@@ -40,7 +107,7 @@ export async function getPublicChapters(req, res, next) {
       members: c.memberCount ?? 0,
       projects: c.casesClosed ?? 0,
       events: c.totalEvents ?? 0,
-      fundsRaised: c.fundsRaised ?? 0,
+      fundsRaised: resolveFundsRaised(c._id, c.fundsRaised, liveMap),
     }));
 
     res.json({ success: true, total: data.length, data });
@@ -53,7 +120,10 @@ export async function getChapter(req, res, next) {
   try {
     const chapter = await Chapter.findById(req.params.id).populate("president", PRESIDENT_FIELDS);
     if (!chapter) return res.status(404).json({ success: false, message: "Chapter not found." });
-    res.json({ success: true, data: chapter });
+    const live = await liveFundsForChapter(chapter._id);
+    const data = chapter.toObject();
+    data.fundsRaised = live > 0 ? live : chapter.fundsRaised ?? 0;
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -262,10 +332,27 @@ export async function getChapterDetails(req, res, next) {
       donationTotals.count += row.count || 0;
     }
 
+    const publicRaisedRows = await Donation.aggregate([
+      {
+        $match: {
+          chapter: chapterOid,
+          status: { $in: ["confirmed", "pending"] },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+    const liveFundsRaised =
+      (donationTotals.pending || 0) +
+      (donationTotals.verified || 0) +
+      (publicRaisedRows[0]?.total || 0);
+    const chapterPayload = chapter.toObject ? chapter.toObject() : chapter;
+    chapterPayload.fundsRaised =
+      liveFundsRaised > 0 ? liveFundsRaised : chapter.fundsRaised ?? 0;
+
     res.json({
       success: true,
       data: {
-        chapter,
+        chapter: chapterPayload,
         president: chapter.president || null,
         team,
         members,

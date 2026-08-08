@@ -102,3 +102,46 @@ export async function clearSentHistory() {
     { method: "DELETE" },
   );
 }
+
+export interface WarningMailRow {
+  _id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  chapterName: string;
+  recipientName: string;
+  recipientEmail: string;
+  recipientRole?: string;
+  emailed: boolean;
+  emailError?: string | null;
+  createdBy?: { _id: string; name: string; email: string } | null;
+  chapter?: { _id: string; name: string; city?: string } | null;
+}
+
+export async function fetchWarningMails() {
+  const res = await api<{ success: true; data: WarningMailRow[] }>("/notifications/warning");
+  return res.data;
+}
+
+export async function sendWarningMail(payload: {
+  chapterId: string;
+  userId: string;
+  title?: string;
+  body: string;
+}) {
+  return api<{
+    success: true;
+    data: WarningMailRow;
+    meta: {
+      emailed: number;
+      emailFailed: number;
+      emailError?: string | null;
+      recipientName: string;
+      recipientEmail: string;
+      chapterName: string;
+    };
+  }>("/notifications/warning", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}

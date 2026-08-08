@@ -10,6 +10,8 @@ import {
   Users2,
   UsersRound,
   Wallet,
+  CalendarDays,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
@@ -97,6 +99,20 @@ const SHORTCUTS = [
     title: "Team & Roles",
     blurb: "Assign directors and teams",
     icon: ShieldCheck,
+  },
+  {
+    module: "events",
+    to: "/chapter/events",
+    title: "Events",
+    blurb: "Post events to the public website",
+    icon: CalendarDays,
+  },
+  {
+    module: "reports",
+    to: "/chapter/reports",
+    title: "Reports",
+    blurb: "Live chapter summary & PDF export",
+    icon: BarChart3,
   },
   {
     module: "members",
