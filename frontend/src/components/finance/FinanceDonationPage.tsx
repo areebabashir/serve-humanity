@@ -41,6 +41,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api, ApiRequestError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import { isCabinetForModuleUser } from "@/lib/chapterRoles";
+import {
+  ApprovalStatusBadge,
+  SubmissionApprovalActions,
+} from "@/components/chapter/SubmissionApproval";
 import {
   calcDonationTotals,
   emptyCabinetMember,
@@ -335,11 +341,15 @@ function PersonRows({
 }
 
 export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
+  const { user } = useAuth();
+  const isCabinet = isCabinetForModuleUser(user, "finance");
   const isScoped = Boolean(scope);
   const [rows, setRows] = useState<FinanceRecord[]>([]);
   const [chapters, setChapters] = useState<ChapterOption[]>([]);
   const [chapterFilter, setChapterFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FinanceRecord | null>(null);
   const [saving, setSaving] = useState(false);
@@ -354,6 +364,22 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
   const [attachments, setAttachments] = useState<FinanceAttachment[]>([]);
   const [syncToDriveOnSave, setSyncToDriveOnSave] = useState(true);
 
+  async function onReview(id: string, approvalStatus: "approved" | "rejected") {
+    setReviewBusy(id);
+    try {
+      await api(`/finance-files/${id}/review`, {
+        method: "PATCH",
+        body: JSON.stringify({ approvalStatus }),
+      });
+      toast.success(approvalStatus === "approved" ? "File approved" : "File rejected");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Review failed");
+    } finally {
+      setReviewBusy(null);
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -364,14 +390,18 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
         qs.set("chapter", chapterFilter);
       }
       if (scope) {
-        const listRes = await api<{ success: true; data: FinanceRecord[] }>(`/finance-files?${qs}`);
+        const listRes = await api<{ success: true; data: FinanceRecord[]; canReview?: boolean }>(
+          `/finance-files?${qs}`,
+        );
         setRows(listRes.data);
+        setCanReview(Boolean(listRes.canReview));
       } else {
         const [listRes, chapRes] = await Promise.all([
-          api<{ success: true; data: FinanceRecord[] }>(`/finance-files?${qs}`),
+          api<{ success: true; data: FinanceRecord[]; canReview?: boolean }>(`/finance-files?${qs}`),
           api<{ success: true; data: ChapterOption[] }>("/chapters"),
         ]);
         setRows(listRes.data);
+        setCanReview(Boolean(listRes.canReview));
         setChapters(chapRes.data);
       }
     } catch (err) {
@@ -589,6 +619,22 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
         }
       />
 
+      {isScoped ? (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-950">
+          {isCabinet ? (
+            <p>
+              <strong>Cabinet view:</strong> You see all finance team submissions. Approve files before
+              they sync to Google Drive or count as official records.
+            </p>
+          ) : (
+            <p>
+              <strong>Your submissions only.</strong> Add or edit your finance files here. Your cabinet
+              member must approve before they appear in official documents or Drive exports.
+            </p>
+          )}
+        </div>
+      ) : null}
+
       {!isScoped ? (
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <div className="space-y-1">
@@ -623,7 +669,9 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
                 <TableHead>Month</TableHead>
                 <TableHead>Team</TableHead>
                 {!isScoped ? <TableHead>Chapter</TableHead> : null}
+                <TableHead>Approval</TableHead>
                 <TableHead>Status</TableHead>
+                {isCabinet && isScoped ? <TableHead>Submitted by</TableHead> : null}
                 <TableHead className="text-right">Society total</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -631,7 +679,7 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={isScoped ? 6 : 7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={isScoped ? (isCabinet ? 8 : 7) : 8} className="text-center text-muted-foreground">
                     No monthly donation files yet.
                   </TableCell>
                 </TableRow>
@@ -643,6 +691,8 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
                   const totals = f.totals || calcDonationTotals(f);
                   const isOpen = expanded === row._id;
                   const onDrive = Boolean(row.pdfDriveFileId);
+                  const locked =
+                    row.approvalStatus === "approved" && !isCabinet && !canReview;
                   return (
                     <Fragment key={row._id}>
                       <TableRow>
@@ -663,6 +713,9 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
                         <TableCell>{f.teamName || "Finance"}</TableCell>
                         {!isScoped ? <TableCell>{chapterName(row.chapter)}</TableCell> : null}
                         <TableCell>
+                          <ApprovalStatusBadge status={row.approvalStatus} />
+                        </TableCell>
+                        <TableCell>
                           <div className="flex flex-wrap items-center gap-1">
                             <Badge variant="secondary">{row.status || "draft"}</Badge>
                             {onDrive ? (
@@ -672,11 +725,23 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
                             ) : null}
                           </div>
                         </TableCell>
+                        {isCabinet && isScoped ? (
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.createdBy?.name || "—"}
+                          </TableCell>
+                        ) : null}
                         <TableCell className="text-right font-medium">
                           {fmtPKR(totals.totalSocietyMembersDonation)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-0.5">
+                          <div className="flex flex-wrap justify-end gap-0.5">
+                            <SubmissionApprovalActions
+                              approvalStatus={row.approvalStatus}
+                              canReview={canReview}
+                              busy={reviewBusy === row._id}
+                              onApprove={() => void onReview(row._id, "approved")}
+                              onReject={() => void onReview(row._id, "rejected")}
+                            />
                             <Button
                               size="icon"
                               variant="ghost"
@@ -694,7 +759,7 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
                               size="icon"
                               variant="ghost"
                               title={onDrive ? "Update PDF on Google Drive" : "Save PDF to Google Drive"}
-                              disabled={driveBusy === row._id}
+                              disabled={driveBusy === row._id || (locked && !isCabinet)}
                               onClick={() => void handleSaveToDrive(row)}
                             >
                               {driveBusy === row._id ? (
@@ -719,12 +784,18 @@ export function FinanceDonationPage({ scope }: { scope?: ChapterScope } = {}) {
                                 <ExternalLink className="h-4 w-4" />
                               </Button>
                             ) : null}
-                            <Button size="icon" variant="ghost" onClick={() => openEdit(row)}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              disabled={locked}
+                              onClick={() => openEdit(row)}
+                            >
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button
                               size="icon"
                               variant="ghost"
+                              disabled={locked}
                               onClick={() => void onDelete(row._id)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />

@@ -3,7 +3,7 @@ import Chapter from "../models/Chapter.js";
 import User from "../models/User.js";
 import mongoose from "mongoose";
 import { uploadToCloudinary } from "../middleware/upload.js";
-import { isOwnCollectionRole, isTeamHeadRole, TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
+import { isOwnCollectionRole, isTeamHeadRole, isCabinetRole, isTeamDirectorRole, isValidTeamLeadRole, TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
 
 const MONTH_NAMES = [
   "",
@@ -56,9 +56,9 @@ function isFinanceDirector(user) {
   return user?.chapterRole === "finance_head";
 }
 
-/** President / VP — personal donations only, no director team. */
+/** President / VP / cabinet — personal donations only, no director team. */
 function hasOwnCollection(user) {
-  return isPresident(user) || isOwnCollectionRole(user?.chapterRole);
+  return isPresident(user) || isOwnCollectionRole(user?.chapterRole) || isCabinetRole(user?.chapterRole);
 }
 
 /** Donations are verified by Finance Director */
@@ -70,9 +70,13 @@ function canViewAll(user) {
   return isPresident(user) || isFinanceDirector(user) || user?.chapterRole === "vice_president";
 }
 
-async function assertValidTeamHead(headId, chapterId) {
+function canViewDirectorTotals(user) {
+  return canViewAll(user) || isCabinetRole(user?.chapterRole);
+}
+
+async function assertValidTeamLead(headId, chapterId) {
   const head = await User.findById(headId).select("chapter chapterRole name");
-  if (!head || String(head.chapter) !== String(chapterId) || !isTeamHeadRole(head.chapterRole)) {
+  if (!head || String(head.chapter) !== String(chapterId) || !isValidTeamLeadRole(head.chapterRole)) {
     return null;
   }
   return head;
@@ -208,9 +212,12 @@ export async function createChapterDonation(req, res, next) {
       screenshotPublicId = result.public_id || "";
     }
 
-    // President / VP donate to their own collection (no team director).
+    // President / VP / cabinet donate to their own collection.
+    // Directors donate into their own team. Members must be assigned to a director.
     let teamDirectorId = null;
-    if (!hasOwnCollection(req.user)) {
+    if (isTeamDirectorRole(req.user.chapterRole)) {
+      teamDirectorId = req.user._id;
+    } else if (!hasOwnCollection(req.user)) {
       let teamDirector = req.user.teamDirector || null;
       if (teamDirector && typeof teamDirector === "object") {
         teamDirector = teamDirector._id || teamDirector;
@@ -220,11 +227,11 @@ export async function createChapterDonation(req, res, next) {
       if (!teamDirector) {
         return res.status(400).json({
           success: false,
-          message: "You are not assigned to a director team. Ask your president to assign you.",
+          message: "You are not assigned to a director yet. Ask your cabinet member to assign you.",
         });
       }
 
-      const head = await assertValidTeamHead(teamDirector, cid);
+      const head = await assertValidTeamLead(teamDirector, cid);
       if (!head) {
         return res.status(400).json({
           success: false,
@@ -281,8 +288,15 @@ export async function listChapterDonations(req, res, next) {
       baseFilter.donor = req.user._id;
     } else if (canViewAll(req.user)) {
       if (directorId) baseFilter.teamDirector = directorId;
-    } else if (isTeamHeadRole(req.user.chapterRole)) {
+    } else if (isTeamDirectorRole(req.user.chapterRole) || isTeamHeadRole(req.user.chapterRole)) {
       baseFilter.teamDirector = req.user._id;
+    } else if (isCabinetRole(req.user.chapterRole)) {
+      const directors = await User.find({
+        chapter: cid,
+        chapterRole: "director",
+        cabinetMember: req.user._id,
+      }).select("_id");
+      baseFilter.teamDirector = { $in: directors.map((d) => d._id) };
     } else {
       baseFilter.donor = req.user._id;
     }
@@ -327,7 +341,7 @@ export async function myTeamCollection(req, res, next) {
         message: "Your account is not assigned to a chapter.",
       });
     }
-    if (!isTeamHeadRole(req.user.chapterRole)) {
+    if (!isTeamDirectorRole(req.user.chapterRole) && !isTeamHeadRole(req.user.chapterRole)) {
       return res.status(403).json({
         success: false,
         message: "Only directors have a team collection.",
@@ -338,13 +352,22 @@ export async function myTeamCollection(req, res, next) {
     const baseFilter = { chapter: cid, teamDirector: req.user._id };
     const listFilter = applyPeriodFilter({ ...baseFilter }, period);
 
-    const [data, byMonth] = await Promise.all([
+    const [data, byMonth, members] = await Promise.all([
       ChapterTeamDonation.find(listFilter)
         .populate("donor", "name email")
         .populate("verifiedBy", "name email")
         .sort({ createdAt: -1 })
         .lean(),
       monthHistory(baseFilter),
+      User.find({
+        chapter: cid,
+        teamDirector: req.user._id,
+        chapterRole: { $in: ["member", "assistant_director"] },
+        isActive: { $ne: false },
+      })
+        .select("name email phone chapterRole avatar lastLogin")
+        .sort({ name: 1 })
+        .lean(),
     ]);
 
     const totals = sumByStatus(data);
@@ -354,6 +377,7 @@ export async function myTeamCollection(req, res, next) {
       ...totals,
       period: periodMeta(period),
       byMonth,
+      members,
       data,
     });
   } catch (err) {
@@ -361,10 +385,10 @@ export async function myTeamCollection(req, res, next) {
   }
 }
 
-/** President / finance: totals grouped by each head/director (current month by default) */
+/** President / finance / cabinet: totals grouped by director (current month by default) */
 export async function directorTeamTotals(req, res, next) {
   try {
-    if (!canViewAll(req.user)) {
+    if (!canViewDirectorTotals(req.user)) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
     const cid = chapterIdOf(req.user);
@@ -375,14 +399,42 @@ export async function directorTeamTotals(req, res, next) {
       });
     }
 
+    const isCabinetView = isCabinetRole(req.user.chapterRole);
     const period = resolvePeriod(req.query);
     const chapterOid = new mongoose.Types.ObjectId(String(cid));
     const match = { chapter: chapterOid };
+
+    let directorQuery = {
+      chapter: cid,
+      chapterRole: { $in: ["director", ...TEAM_HEAD_ROLES] },
+      isActive: true,
+    };
+    if (isCabinetView) {
+      directorQuery = {
+        chapter: cid,
+        chapterRole: "director",
+        cabinetMember: req.user._id,
+        isActive: true,
+      };
+    }
+
+    const directors = await User.find(directorQuery)
+      .select("name email chapterRole phone")
+      .sort({ name: 1 })
+      .lean();
+
+    const directorIds = directors.map((d) => d._id);
+    if (isCabinetView && directorIds.length > 0) {
+      match.teamDirector = { $in: directorIds };
+    } else if (isCabinetView) {
+      match.teamDirector = { $in: [] };
+    }
+
     if (period) {
       match.createdAt = { $gte: period.start, $lt: period.end };
     }
 
-    const [rows, byMonth] = await Promise.all([
+    const [rows, byMonth, allMembers, unassignedMembers] = await Promise.all([
       ChapterTeamDonation.aggregate([
         { $match: match },
         {
@@ -393,15 +445,43 @@ export async function directorTeamTotals(req, res, next) {
           },
         },
       ]),
-      monthHistory({ chapter: chapterOid }),
+      monthHistory(isCabinetView ? { chapter: chapterOid, teamDirector: { $in: directorIds } } : { chapter: chapterOid }),
+      directorIds.length
+        ? User.find({
+            chapter: cid,
+            teamDirector: { $in: directorIds },
+            chapterRole: { $in: ["member", "assistant_director"] },
+            isActive: { $ne: false },
+          })
+            .select("name email phone teamDirector")
+            .sort({ name: 1 })
+            .lean()
+        : [],
+      isCabinetView
+        ? User.find({
+            chapter: cid,
+            cabinetMember: req.user._id,
+            chapterRole: { $in: ["member", "assistant_director"] },
+            $or: [{ teamDirector: null }, { teamDirector: { $exists: false } }],
+            isActive: { $ne: false },
+          })
+            .select("name email phone")
+            .sort({ name: 1 })
+            .lean()
+        : [],
     ]);
 
-    const directors = await User.find({
-      chapter: cid,
-      chapterRole: { $in: TEAM_HEAD_ROLES },
-    })
-      .select("name email chapterRole")
-      .lean();
+    const membersByDirector = new Map();
+    for (const m of allMembers) {
+      const key = String(m.teamDirector);
+      if (!membersByDirector.has(key)) membersByDirector.set(key, []);
+      membersByDirector.get(key).push({
+        _id: m._id,
+        name: m.name,
+        email: m.email,
+        phone: m.phone,
+      });
+    }
 
     const byDirector = directors.map((d) => {
       const pending = rows.find(
@@ -412,6 +492,7 @@ export async function directorTeamTotals(req, res, next) {
       );
       return {
         director: d,
+        members: membersByDirector.get(String(d._id)) || [],
         pendingTotal: pending?.total || 0,
         verifiedTotal: verified?.total || 0,
         pendingCount: pending?.count || 0,
@@ -436,19 +517,29 @@ export async function directorTeamTotals(req, res, next) {
 
     res.json({
       success: true,
+      scope: isCabinetView ? "cabinet" : "chapter",
       period: periodMeta(period),
       byMonth,
       chapterPendingTotal: chapterPending,
       chapterVerifiedTotal: chapterVerified,
       chapterGrandTotal: chapterPending + chapterVerified,
       directors: byDirector,
-      unassigned: {
-        pendingTotal: unassignedPending?.total || 0,
-        verifiedTotal: unassignedVerified?.total || 0,
-        pendingCount: unassignedPending?.count || 0,
-        verifiedCount: unassignedVerified?.count || 0,
-        grandTotal: (unassignedPending?.total || 0) + (unassignedVerified?.total || 0),
-      },
+      unassignedMembers: isCabinetView ? unassignedMembers : [],
+      unassigned: isCabinetView
+        ? {
+            pendingTotal: 0,
+            verifiedTotal: 0,
+            pendingCount: 0,
+            verifiedCount: 0,
+            grandTotal: 0,
+          }
+        : {
+            pendingTotal: unassignedPending?.total || 0,
+            verifiedTotal: unassignedVerified?.total || 0,
+            pendingCount: unassignedPending?.count || 0,
+            verifiedCount: unassignedVerified?.count || 0,
+            grandTotal: (unassignedPending?.total || 0) + (unassignedVerified?.total || 0),
+          },
       canVerify: isFinanceDirector(req.user),
     });
   } catch (err) {

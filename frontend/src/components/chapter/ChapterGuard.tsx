@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
   canAccessChapterModule,
+  canAccessChapterModuleForUser,
   isChapterAppUser,
   resolveChapterRole,
   type ChapterRole,
@@ -31,8 +32,7 @@ export function ChapterGuard({
   }
 
   if (module) {
-    const role = resolveChapterRole(user);
-    if (!canAccessChapterModule(role, module)) {
+    if (!canAccessChapterModuleForUser(user, module)) {
       return <Navigate to="/chapter" replace />;
     }
   }

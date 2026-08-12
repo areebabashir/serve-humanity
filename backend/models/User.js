@@ -78,7 +78,13 @@ const userSchema = new mongoose.Schema(
       default: "member",
     },
     chapter: { type: mongoose.Schema.Types.ObjectId, ref: "Chapter", default: null },
-    /** Director this member belongs to (team collection rollup) */
+    /** Cabinet member this user reports to (assigned by President / VP) */
+    cabinetMember: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    /** Director this member belongs to (team collection rollup; assigned by cabinet) */
     teamDirector: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

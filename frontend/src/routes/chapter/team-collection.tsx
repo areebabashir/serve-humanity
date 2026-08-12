@@ -23,6 +23,14 @@ type DonationRow = {
   donor?: { name?: string; email?: string };
 };
 
+type TeamMember = {
+  _id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  lastLogin?: string;
+};
+
 function fmt(n: number) {
   return `PKR ${Number(n || 0).toLocaleString()}`;
 }
@@ -30,6 +38,7 @@ function fmt(n: number) {
 export default function TeamCollectionPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<DonationRow[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [verifiedTotal, setVerifiedTotal] = useState(0);
   const [grandTotal, setGrandTotal] = useState(0);
@@ -42,6 +51,7 @@ export default function TeamCollectionPage() {
       const res = await api<{
         success: true;
         data: DonationRow[];
+        members?: TeamMember[];
         pendingTotal: number;
         verifiedTotal: number;
         grandTotal: number;
@@ -49,6 +59,7 @@ export default function TeamCollectionPage() {
         byMonth?: MonthCollectionRow[];
       }>("/chapter-donations/my-team");
       setRows(res.data || []);
+      setMembers(res.members || []);
       setPendingTotal(res.pendingTotal || 0);
       setVerifiedTotal(res.verifiedTotal || 0);
       setGrandTotal(res.grandTotal || 0);
@@ -69,7 +80,7 @@ export default function TeamCollectionPage() {
     <div>
       <ChapterPageHeader
         title="Your team collection"
-        description={`This month (${periodLabel}). When a new month starts, totals reset to zero and previous months stay saved.`}
+        description={`Members assigned to you and their donations for ${periodLabel}. Totals reset each month.`}
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -86,6 +97,49 @@ export default function TeamCollectionPage() {
           <p className="mt-1 font-display text-xl font-bold">{fmt(grandTotal)}</p>
         </ChapterCard>
       </div>
+
+      <ChapterCard className="mb-5 overflow-x-auto p-0 md:p-0">
+        <div className="border-b border-border px-4 py-3">
+          <h3 className="text-sm font-semibold">Your team members ({members.length})</h3>
+          <p className="text-xs text-muted-foreground">Members assigned to you by your cabinet member</p>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Last login</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-muted-foreground">
+                  <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
+                </TableCell>
+              </TableRow>
+            ) : members.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-muted-foreground">
+                  No members assigned to you yet. Ask your cabinet member to assign members.
+                </TableCell>
+              </TableRow>
+            ) : (
+              members.map((m) => (
+                <TableRow key={m._id}>
+                  <TableCell className="font-medium">{m.name}</TableCell>
+                  <TableCell>{m.email || "—"}</TableCell>
+                  <TableCell>{m.phone || "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {m.lastLogin ? new Date(m.lastLogin).toLocaleDateString() : "—"}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </ChapterCard>
 
       <div className="mb-5">
         <MonthCollectionHistory rows={byMonth} />

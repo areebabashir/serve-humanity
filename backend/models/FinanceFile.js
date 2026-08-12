@@ -43,6 +43,33 @@ const financeFileSchema = new mongoose.Schema(
       enum: ["draft", "submitted", "reviewed", "archived"],
       default: "draft",
     },
+    /** Cabinet approval — only approved records count as official / on Drive exports */
+    approvalStatus: {
+      type: String,
+      enum: ["draft", "pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+    teamModule: {
+      type: String,
+      enum: ["finance", "operations", "verification", "documentation", "media", ""],
+      default: "finance",
+      index: true,
+    },
+    cabinetMember: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+    teamDirector: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewNote: { type: String, default: "" },
     /** Generated PDF on Google Drive (updated on re-export) */
     pdfDriveFileId: { type: String, default: "" },
     pdfDriveWebViewLink: { type: String, default: "" },

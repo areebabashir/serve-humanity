@@ -17,7 +17,7 @@ import { Reveal } from "@/components/site/Reveal";
 import logoAsset from "@/assets/logo.png";
 import { api, ApiRequestError } from "@/lib/api";
 import { daysUntilEvent } from "@/lib/eventCountdown";
-import { LOCAL_WEBSITE_DEFAULTS, useWebsitePage } from "@/lib/websiteContent";
+import { LOCAL_WEBSITE_DEFAULTS, readOfflineCache, useWebsitePage, writeOfflineCache } from "@/lib/websiteContent";
 import { DonateAccountButton } from "@/components/site/DonateAccountButton";
 
 type HomeSections = {
@@ -543,7 +543,10 @@ function Impact({ sections }: { sections: HomeSections }) {
 /* ---------------- CHAPTERS MAP ---------------- */
 function Chapters({ sections }: { sections: HomeSections }) {
   const mapCopy = sections.chaptersMap ?? {};
-  const [pins, setPins] = useState<MapPin[]>(FALLBACK_MAP_PINS);
+  const [pins, setPins] = useState<MapPin[]>(() => {
+    const cached = readOfflineCache<MapPin[]>("home:chapters-map");
+    return cached?.length ? cached : FALLBACK_MAP_PINS;
+  });
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -555,28 +558,32 @@ function Chapters({ sections }: { sections: HomeSections }) {
         if (cancelled) return;
         const list = Array.isArray(res.data) ? res.data : [];
         if (!list.length) {
-          setPins(FALLBACK_MAP_PINS);
+          const cached = readOfflineCache<MapPin[]>("home:chapters-map");
+          setPins(cached?.length ? cached : FALLBACK_MAP_PINS);
           return;
         }
-        setPins(
-          list.map((c, i) => {
-            const label = c.city || c.name || `Chapter ${i + 1}`;
-            const pos = coordsForCity(label, i);
-            return {
-              name: label,
-              president: c.president || "TBD",
-              members: Number(c.members) || 0,
-              projects: Number(c.projects) || 0,
-              imageUrl: c.imageUrl || "",
-              x: pos.x,
-              y: pos.y,
-            };
-          }),
-        );
+        const next = list.map((c, i) => {
+          const label = c.city || c.name || `Chapter ${i + 1}`;
+          const pos = coordsForCity(label, i);
+          return {
+            name: label,
+            president: c.president || "TBD",
+            members: Number(c.members) || 0,
+            projects: Number(c.projects) || 0,
+            imageUrl: c.imageUrl || "",
+            x: pos.x,
+            y: pos.y,
+          };
+        });
+        writeOfflineCache("home:chapters-map", next);
+        setPins(next);
         setActive(0);
       })
       .catch(() => {
-        if (!cancelled) setPins(FALLBACK_MAP_PINS);
+        if (!cancelled) {
+          const cached = readOfflineCache<MapPin[]>("home:chapters-map");
+          setPins(cached?.length ? cached : FALLBACK_MAP_PINS);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -847,7 +854,7 @@ function Events() {
   const hero = sections.hero ?? {};
   const [items, setItems] = useState<
     { id: string; title: string; date: string; dateIso?: string | null; location: string; days: number }[]
-  >([]);
+  >(() => readOfflineCache("home:events") || []);
   const title = hero.title || "Show up. Change lives.";
   const highlight = hero.titleHighlight || "Change lives.";
   const titleLead = title.replace(highlight, "").trim() || "Show up.";
@@ -866,10 +873,16 @@ function Events() {
       }[];
     }>("/website-events/public?limit=3")
       .then((res) => {
-        if (!cancelled) setItems((res.data || []).slice(0, 3));
+        if (cancelled) return;
+        const next = (res.data || []).slice(0, 3);
+        writeOfflineCache("home:events", next);
+        setItems(next);
       })
       .catch(() => {
-        if (!cancelled) setItems([]);
+        if (!cancelled) {
+          const cached = readOfflineCache<typeof items>("home:events");
+          setItems(cached?.length ? cached : []);
+        }
       });
     return () => {
       cancelled = true;

@@ -108,6 +108,15 @@ export async function getPublicChapters(req, res, next) {
       projects: c.casesClosed ?? 0,
       events: c.totalEvents ?? 0,
       fundsRaised: resolveFundsRaised(c._id, c.fundsRaised, liveMap),
+      donationAccounts: (c.donationAccounts || [])
+        .filter((a) => a && String(a.accountNumber || "").trim())
+        .map((a) => ({
+          bankName: a.bankName || "",
+          accountTitle: a.accountTitle || "",
+          accountNumber: a.accountNumber || "",
+          iban: a.iban || "",
+          note: a.note || "",
+        })),
     }));
 
     res.json({ success: true, total: data.length, data });
@@ -284,8 +293,9 @@ export async function getChapterDetails(req, res, next) {
       recentTeamDonations,
     ] = await Promise.all([
       User.find({ chapter: chapterOid })
-        .select("name email phone chapterRole systemRole teamDirector lastLogin avatar isActive")
+        .select("name email phone chapterRole systemRole teamDirector cabinetMember lastLogin avatar isActive")
         .populate("teamDirector", "name email chapterRole")
+        .populate("cabinetMember", "name email chapterRole")
         .sort({ chapterRole: 1, name: 1 })
         .lean(),
       Member.find({ chapter: chapterOid }).sort({ joinedAt: -1 }).lean(),
@@ -488,6 +498,30 @@ export async function assignChapterPresident(req, res, next) {
   }
 }
 
+function normalizeDonationAccounts(raw) {
+  if (!Array.isArray(raw)) return null;
+  const cleaned = raw
+    .slice(0, 3)
+    .map((a) => ({
+      bankName: String(a?.bankName || "").trim(),
+      accountTitle: String(a?.accountTitle || "").trim(),
+      accountNumber: String(a?.accountNumber || "").trim(),
+      iban: String(a?.iban || "").trim(),
+      note: String(a?.note || "").trim(),
+    }))
+    .filter((a) => a.accountNumber || a.bankName || a.accountTitle || a.iban);
+  return cleaned;
+}
+
+function isChapterPresidentUser(user, chapterId) {
+  if (!user) return false;
+  const isPres =
+    user.systemRole === "president" || user.chapterRole === "president";
+  if (!isPres) return false;
+  const cid = user.chapter?._id || user.chapter;
+  return cid && String(cid) === String(chapterId);
+}
+
 export async function updateChapter(req, res, next) {
   try {
     const allowed = [
@@ -519,6 +553,62 @@ export async function updateChapter(req, res, next) {
     req.app.get("io")?.to(`chapter:${chapter._id}`).emit("chapter:updated", chapter);
 
     res.json({ success: true, data: chapter });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Chapter president sets 1–3 bank accounts shown on the public donate page.
+ * PATCH /chapters/:id/donation-accounts
+ */
+export async function updateChapterDonationAccounts(req, res, next) {
+  try {
+    const chapter = await Chapter.findById(req.params.id);
+    if (!chapter) return res.status(404).json({ success: false, message: "Chapter not found." });
+
+    if (!isChapterPresidentUser(req.user, chapter._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the president of this chapter can set donation accounts.",
+      });
+    }
+
+    const accounts = normalizeDonationAccounts(req.body?.donationAccounts);
+    if (accounts === null) {
+      return res.status(400).json({
+        success: false,
+        message: "donationAccounts must be an array (up to 3 accounts).",
+      });
+    }
+    if (accounts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Add at least one account with an account number.",
+      });
+    }
+    for (const a of accounts) {
+      if (!a.accountNumber) {
+        return res.status(400).json({
+          success: false,
+          message: "Each account needs an account number.",
+        });
+      }
+    }
+
+    chapter.donationAccounts = accounts;
+    chapter.lastActivity = new Date();
+    await chapter.save();
+
+    req.app.get("io")?.to(`chapter:${chapter._id}`).emit("chapter:updated", chapter);
+
+    res.json({
+      success: true,
+      data: {
+        _id: chapter._id,
+        donationAccounts: chapter.donationAccounts,
+      },
+    });
   } catch (err) {
     next(err);
   }

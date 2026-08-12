@@ -1,5 +1,12 @@
 import User, { CEO_DASHBOARD_ROLES, FULL_ACCESS_ROLES, isFullAccessRole } from "../models/User.js";
-import { isOwnCollectionRole, isTeamHeadRole, TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
+import {
+  isOwnCollectionRole,
+  isCabinetRole,
+  isTeamDirectorRole,
+  isValidTeamLeadRole,
+  CABINET_ROLES,
+  CABINET_ASSIGNABLE_ROLES,
+} from "../lib/teamHeads.js";
 
 const USER_LEADERSHIP = new Set(FULL_ACCESS_ROLES);
 
@@ -15,11 +22,10 @@ const BOARD_CREATABLE_ROLES = [
   "bog_documentation",
 ];
 
-/** Roles president / VP may assign (VP + directors). VP has no team collection. */
-export const DIRECTOR_ASSIGNABLE_ROLES = ["vice_president", ...TEAM_HEAD_ROLES];
-
-/** @deprecated use DIRECTOR_ASSIGNABLE_ROLES */
-export const PRESIDENT_ASSIGNABLE_ROLES = DIRECTOR_ASSIGNABLE_ROLES;
+/** @deprecated */
+export const DIRECTOR_ASSIGNABLE_ROLES = CABINET_ASSIGNABLE_ROLES;
+/** @deprecated */
+export const PRESIDENT_ASSIGNABLE_ROLES = CABINET_ASSIGNABLE_ROLES;
 
 function chapterIdOf(user) {
   if (!user?.chapter) return null;
@@ -32,6 +38,15 @@ function isChapterPresident(user) {
 
 function canAssignRoles(user) {
   return isChapterPresident(user) || user?.chapterRole === "vice_president";
+}
+
+function isCabinetUser(user) {
+  return isCabinetRole(user?.chapterRole);
+}
+
+function refId(ref) {
+  if (!ref) return null;
+  return ref._id || ref;
 }
 
 /** CEO dashboard board: full-access leaders + BOG accounts */
@@ -53,7 +68,7 @@ export async function getBoardMembers(req, res, next) {
 }
 
 /**
- * Chapter president / VP creates a director (or VP) login with password.
+ * Chapter president / VP creates VP or cabinet member login.
  * POST /users/chapter-directors
  */
 export async function createChapterDirector(req, res, next) {
@@ -61,7 +76,7 @@ export async function createChapterDirector(req, res, next) {
     if (!canAssignRoles(req.user)) {
       return res.status(403).json({
         success: false,
-        message: "Only the president or vice president can create director accounts.",
+        message: "Only the president or vice president can create cabinet accounts.",
       });
     }
 
@@ -87,10 +102,10 @@ export async function createChapterDirector(req, res, next) {
         message: "Password must be at least 6 characters.",
       });
     }
-    if (!DIRECTOR_ASSIGNABLE_ROLES.includes(chapterRole)) {
+    if (!CABINET_ASSIGNABLE_ROLES.includes(chapterRole)) {
       return res.status(400).json({
         success: false,
-        message: "Pick a valid role (Vice President or a director seat).",
+        message: "Pick a valid role (Vice President or a cabinet seat).",
       });
     }
 
@@ -119,6 +134,7 @@ export async function createChapterDirector(req, res, next) {
       systemRole: "member",
       chapterRole,
       chapter: chapterId,
+      cabinetMember: null,
       teamDirector: null,
       isActive: true,
     });
@@ -126,6 +142,69 @@ export async function createChapterDirector(req, res, next) {
     const safe = await User.findById(user._id)
       .select("-password")
       .populate("chapter", "name city");
+    res.status(201).json({ success: true, data: safe });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Cabinet member creates a team director under their cabinet.
+ * POST /users/team-directors
+ */
+export async function createTeamDirector(req, res, next) {
+  try {
+    if (!isCabinetUser(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only cabinet members can create directors for their team.",
+      });
+    }
+
+    const chapterId = chapterIdOf(req.user);
+    if (!chapterId) {
+      return res.status(400).json({
+        success: false,
+        message: "Your account is not linked to a chapter.",
+      });
+    }
+
+    const { name, email, password, phone } = req.body || {};
+    if (!name?.trim() || !email?.trim() || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required.",
+      });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    const exists = await User.findOne({ email: String(email).toLowerCase().trim() });
+    if (exists) {
+      return res.status(409).json({ success: false, message: "Email already registered." });
+    }
+
+    const user = await User.create({
+      name: name.trim(),
+      email: String(email).toLowerCase().trim(),
+      password,
+      phone: phone?.trim() || "",
+      systemRole: "member",
+      chapterRole: "director",
+      chapter: chapterId,
+      cabinetMember: req.user._id,
+      teamDirector: null,
+      isActive: true,
+    });
+
+    const safe = await User.findById(user._id)
+      .select("-password")
+      .populate("chapter", "name city")
+      .populate("cabinetMember", "name email chapterRole");
     res.status(201).json({ success: true, data: safe });
   } catch (err) {
     next(err);
@@ -200,6 +279,12 @@ export async function getAllUsers(req, res, next) {
       const cid = chapterIdOf(req.user);
       if (cid) filter.chapter = cid;
       else filter.chapter = null;
+      if (isCabinetUser(req.user) && !canAssignRoles(req.user)) {
+        filter.$or = [
+          { cabinetMember: req.user._id },
+          { _id: req.user._id },
+        ];
+      }
     }
 
     const skip = (Number(page) - 1) * Number(limit);
@@ -208,6 +293,7 @@ export async function getAllUsers(req, res, next) {
         .skip(skip)
         .limit(Number(limit))
         .populate("chapter", "name city")
+        .populate("cabinetMember", "name email chapterRole")
         .populate("teamDirector", "name email chapterRole")
         .sort({ createdAt: -1 }),
       User.countDocuments(filter),
@@ -234,13 +320,18 @@ export async function updateUser(req, res, next) {
     const isSelf = String(req.user._id) === String(targetId);
     const isLeader = isFullAccessRole(req.user.systemRole);
     const asAssigner = canAssignRoles(req.user);
+    const asCabinet = isCabinetUser(req.user);
 
-    if (!isSelf && !isLeader && !asAssigner) {
+    if (!isSelf && !isLeader && !asAssigner && !asCabinet) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
     if (isSelf && !isLeader) {
-      if (req.body.chapterRole !== undefined || req.body.teamDirector !== undefined) {
+      if (
+        req.body.chapterRole !== undefined ||
+        req.body.teamDirector !== undefined ||
+        req.body.cabinetMember !== undefined
+      ) {
         return res.status(403).json({
           success: false,
           message: "You cannot change your own role or team assignment.",
@@ -255,15 +346,36 @@ export async function updateUser(req, res, next) {
         runValidators: true,
       })
         .populate("chapter", "name city")
+        .populate("cabinetMember", "name email chapterRole")
         .populate("teamDirector", "name email chapterRole");
       if (!user) return res.status(404).json({ success: false, message: "User not found." });
       return res.json({ success: true, data: user });
     }
 
+    const target = await User.findById(targetId);
+    if (!target) return res.status(404).json({ success: false, message: "User not found." });
+    const cid = chapterIdOf(req.user);
+
+    if (!isLeader && String(target.chapter) !== String(cid)) {
+      return res.status(403).json({ success: false, message: "User is not in your chapter." });
+    }
+
     const updates = {};
     const allowed = isLeader
-      ? ["name", "phone", "avatar", "chapterRole", "systemRole", "chapter", "teamDirector", "isActive"]
-      : ["name", "phone", "avatar", "chapterRole", "teamDirector", "isActive"];
+      ? [
+          "name",
+          "phone",
+          "avatar",
+          "chapterRole",
+          "systemRole",
+          "chapter",
+          "teamDirector",
+          "cabinetMember",
+          "isActive",
+        ]
+      : asAssigner
+        ? ["name", "phone", "avatar", "chapterRole", "cabinetMember", "isActive"]
+        : ["teamDirector"];
 
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
@@ -272,62 +384,99 @@ export async function updateUser(req, res, next) {
     if (updates.teamDirector === "" || updates.teamDirector === "none") {
       updates.teamDirector = null;
     }
+    if (updates.cabinetMember === "" || updates.cabinetMember === "none") {
+      updates.cabinetMember = null;
+    }
 
-    if (!isLeader && updates.teamDirector !== undefined) {
-      if (!asAssigner) {
+    // Cabinet: assign members in their cabinet to one of their directors
+    if (!isLeader && asCabinet && !asAssigner) {
+      if (updates.chapterRole !== undefined || updates.cabinetMember !== undefined) {
         return res.status(403).json({
           success: false,
-          message: "Only the president or vice president can assign team membership.",
+          message: "Cabinet members can only assign members to their directors.",
         });
       }
-      if (updates.teamDirector) {
-        const director = await User.findById(updates.teamDirector);
-        const cid = chapterIdOf(req.user);
-        if (
-          !director ||
-          !isTeamHeadRole(director.chapterRole) ||
-          String(director.chapter) !== String(cid)
-        ) {
-          return res.status(400).json({
+      if (updates.teamDirector !== undefined) {
+        const inCabinet =
+          String(refId(target.cabinetMember)) === String(req.user._id) &&
+          target.chapterRole === "member";
+        if (!inCabinet) {
+          return res.status(403).json({
             success: false,
-            message: "Pick a valid director (head) from your chapter.",
+            message: "You can only assign members who belong to your cabinet.",
           });
+        }
+        if (updates.teamDirector) {
+          const director = await User.findById(updates.teamDirector);
+          if (
+            !director ||
+            director.chapterRole !== "director" ||
+            String(refId(director.cabinetMember)) !== String(req.user._id) ||
+            String(director.chapter) !== String(cid)
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Pick a director from your own cabinet team.",
+            });
+          }
         }
       }
     }
 
-    if (!isLeader && updates.chapterRole !== undefined) {
-      if (!asAssigner) {
-        return res.status(403).json({
-          success: false,
-          message: "Only the president or vice president can assign roles.",
-        });
-      }
-      if (
-        updates.chapterRole !== "member" &&
-        !DIRECTOR_ASSIGNABLE_ROLES.includes(updates.chapterRole)
-      ) {
+    // President / VP: assign members to cabinet; set VP / cabinet seats
+    if (!isLeader && asAssigner) {
+      if (updates.teamDirector !== undefined) {
         return res.status(400).json({
           success: false,
-          message: "That role cannot be assigned.",
+          message: "President and VP assign members to a cabinet member, not a director.",
         });
       }
-      const target = await User.findById(targetId);
-      if (!target) return res.status(404).json({ success: false, message: "User not found." });
-      if (target.systemRole === "president" || target.chapterRole === "president") {
-        return res.status(403).json({
-          success: false,
-          message: "Cannot change the president account role from here.",
-        });
-      }
-      if (isTeamHeadRole(updates.chapterRole) || isOwnCollectionRole(updates.chapterRole)) {
+      if (updates.cabinetMember !== undefined) {
+        if (target.chapterRole !== "member" && target.chapterRole !== "assistant_director") {
+          return res.status(400).json({
+            success: false,
+            message: "Only members can be assigned to a cabinet.",
+          });
+        }
+        if (updates.cabinetMember) {
+          const cabinet = await User.findById(updates.cabinetMember);
+          if (
+            !cabinet ||
+            !isCabinetRole(cabinet.chapterRole) ||
+            String(cabinet.chapter) !== String(cid)
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Pick a valid cabinet member from your chapter.",
+            });
+          }
+        }
         updates.teamDirector = null;
+      }
+      if (updates.chapterRole !== undefined) {
+        if (
+          updates.chapterRole !== "member" &&
+          !CABINET_ASSIGNABLE_ROLES.includes(updates.chapterRole)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "That role cannot be assigned.",
+          });
+        }
+        if (target.systemRole === "president" || target.chapterRole === "president") {
+          return res.status(403).json({
+            success: false,
+            message: "Cannot change the president account role from here.",
+          });
+        }
+        if (isCabinetRole(updates.chapterRole) || isOwnCollectionRole(updates.chapterRole)) {
+          updates.cabinetMember = null;
+          updates.teamDirector = null;
+        }
       }
     }
 
     if (isLeader && updates.systemRole !== undefined) {
-      const target = await User.findById(targetId);
-      if (!target) return res.status(404).json({ success: false, message: "User not found." });
       if (isFullAccessRole(target.systemRole) && updates.systemRole !== target.systemRole) {
         return res.status(400).json({
           success: false,
@@ -362,14 +511,15 @@ export async function updateUser(req, res, next) {
           message: "Password must be at least 6 characters.",
         });
       }
-      const target = await User.findById(targetId).select("+password");
-      if (!target) return res.status(404).json({ success: false, message: "User not found." });
-      Object.assign(target, updates);
-      target.password = req.body.password;
-      target.passwordChangedAt = new Date();
-      await target.save();
+      const pwTarget = await User.findById(targetId).select("+password");
+      if (!pwTarget) return res.status(404).json({ success: false, message: "User not found." });
+      Object.assign(pwTarget, updates);
+      pwTarget.password = req.body.password;
+      pwTarget.passwordChangedAt = new Date();
+      await pwTarget.save();
       const safe = await User.findById(targetId)
         .populate("chapter", "name city")
+        .populate("cabinetMember", "name email chapterRole")
         .populate("teamDirector", "name email chapterRole");
       return res.json({ success: true, data: safe });
     }
@@ -379,6 +529,7 @@ export async function updateUser(req, res, next) {
       runValidators: true,
     })
       .populate("chapter", "name city")
+      .populate("cabinetMember", "name email chapterRole")
       .populate("teamDirector", "name email chapterRole");
     if (!user) return res.status(404).json({ success: false, message: "User not found." });
     res.json({ success: true, data: user });

@@ -21,7 +21,8 @@ export async function protect(req, res, next) {
     req.user = await User.findById(decoded.id)
       .select("-password")
       .populate("chapter", "name city")
-      .populate("teamDirector", "name email chapterRole");
+      .populate("teamDirector", "name email chapterRole")
+      .populate("cabinetMember", "name email chapterRole");
 
     if (!req.user) {
       return res.status(401).json({ success: false, message: "User no longer exists." });

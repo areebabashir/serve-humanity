@@ -18,7 +18,6 @@ interface AuthContextValue {
     email: string;
     password: string;
     chapter: string;
-    teamDirector: string;
   }) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -68,7 +67,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: string;
       password: string;
       chapter: string;
-      teamDirector: string;
     }) => {
       const data = await api<{ success: true; token: string; user: AuthUser }>("/auth/register", {
         method: "POST",

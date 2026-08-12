@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { PageHero } from "@/components/site/PageHero";
 import { Reveal } from "@/components/site/Reveal";
 import { MapPin, Users, Package, Heart, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { highlightTitle, useWebsitePage } from "@/lib/websiteContent";
+import { highlightTitle, readOfflineCache, useWebsitePage, writeOfflineCache } from "@/lib/websiteContent";
 
 type ChaptersSections = {
   hero?: { eyebrow?: string; title?: string; titleHighlight?: string; description?: string };
@@ -41,7 +42,9 @@ export default function Page() {
     dbOnly: true,
   });
   const hero = sections.hero ?? {};
-  const [chapters, setChapters] = useState<PublicChapter[]>([]);
+  const [chapters, setChapters] = useState<PublicChapter[]>(
+    () => readOfflineCache<PublicChapter[]>("public:chapters") || [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,10 +54,19 @@ export default function Page() {
     setError(null);
     api<{ success: true; data: PublicChapter[] }>("/chapters/public")
       .then((res) => {
-        if (!cancelled) setChapters(res.data ?? []);
+        if (cancelled) return;
+        const list = res.data ?? [];
+        writeOfflineCache("public:chapters", list);
+        setChapters(list);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load chapters");
+        if (cancelled) return;
+        const cached = readOfflineCache<PublicChapter[]>("public:chapters");
+        if (cached?.length) {
+          setChapters(cached);
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load chapters");
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -161,6 +173,13 @@ export default function Page() {
                           <div className="text-[10px] uppercase text-muted-foreground">Raised</div>
                         </div>
                       </div>
+                      <Link
+                        to="/donate"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-warm px-5 py-3 text-sm font-bold text-white shadow-warm transition hover:-translate-y-0.5"
+                      >
+                        <Heart className="h-4 w-4 fill-white" />
+                        Donate now
+                      </Link>
                     </div>
                   </div>
                 </Reveal>

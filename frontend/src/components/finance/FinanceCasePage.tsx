@@ -74,8 +74,9 @@ export interface FinanceRecord {
   attachments?: FinanceAttachment[];
   notes?: string;
   status?: string;
+  approvalStatus?: string;
   createdAt?: string;
-  createdBy?: { name?: string };
+  createdBy?: { name?: string; email?: string };
   pdfDriveFileId?: string;
   pdfDriveWebViewLink?: string;
   pdfDrivePath?: string;

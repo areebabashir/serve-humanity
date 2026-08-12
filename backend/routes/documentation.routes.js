@@ -7,6 +7,7 @@ import {
   createDoc,
   updateDoc,
   deleteDoc,
+  reviewDoc,
   uploadDocAttachment,
   uploadDocPdf,
   getDocStats,
@@ -17,10 +18,11 @@ const router = Router();
 const DOC_SYSTEM = ["ceo", "bog_documentation", "president"];
 const DOC_CHAPTER = [
   "documentation_head",
-  "it_head",
   "president",
   "vice_president",
   "director",
+  "assistant_director",
+  "member",
 ];
 
 const canView = requireSystemOrChapter({ system: DOC_SYSTEM, chapter: DOC_CHAPTER });
@@ -34,6 +36,7 @@ router.post("/upload-pdf", canEdit, upload.single("file"), uploadDocPdf);
 router.get("/:id", canView, getDoc);
 router.post("/", canEdit, createDoc);
 router.patch("/:id", canEdit, updateDoc);
+router.patch("/:id/review", canEdit, reviewDoc);
 router.delete("/:id", canEdit, deleteDoc);
 
 export default router;

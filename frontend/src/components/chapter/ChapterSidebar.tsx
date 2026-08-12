@@ -24,8 +24,10 @@ import {
 import { useAuth } from "@/lib/auth";
 import {
   canAccessChapterModule,
+  canAccessChapterModuleForUser,
   CHAPTER_ROLE_LABEL,
   chapterHomeForUser,
+  isCabinetRole,
   isChapterLeadership,
   isPlainMember,
   resolveChapterRole,
@@ -89,11 +91,11 @@ export function ChapterSidebar() {
   const [opsOpen, setOpsOpen] = useState(opsActive);
 
   const showOps =
-    canAccessChapterModule(role, "ops") ||
-    canAccessChapterModule(role, "verification") ||
-    canAccessChapterModule(role, "operations");
-  const visible = NAV.filter((i) => canAccessChapterModule(role, i.module));
-  const opsLinks = OPS_SUB.filter((s) => canAccessChapterModule(role, s.module));
+    canAccessChapterModuleForUser(user, "ops") ||
+    canAccessChapterModuleForUser(user, "verification") ||
+    canAccessChapterModuleForUser(user, "operations");
+  const visible = NAV.filter((i) => canAccessChapterModuleForUser(user, i.module));
+  const opsLinks = OPS_SUB.filter((s) => canAccessChapterModuleForUser(user, s.module));
   const plain = isPlainMember(role);
   const dashboardHome = user ? chapterHomeForUser(user) : plain ? "/chapter/my-donation" : "/chapter";
 
@@ -198,7 +200,9 @@ export function ChapterSidebar() {
                   }
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.title}
+                  {item.module === "director-donations" && isCabinetRole(role)
+                    ? "Cabinet donations"
+                    : item.title}
                 </NavLink>
               ))}
             </div>

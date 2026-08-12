@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/User.js";
 import Chapter from "../models/Chapter.js";
-import { isTeamHeadRole } from "../lib/teamHeads.js";
 import { sendEmail } from "../utils/email.js";
 import { buildPasswordResetEmail } from "../utils/emailTemplates.js";
 
@@ -14,6 +13,7 @@ async function loadAuthUser(userId) {
   return User.findById(userId)
     .select("-password")
     .populate("chapter", "name city")
+    .populate("cabinetMember", "name email chapterRole")
     .populate("teamDirector", "name email chapterRole");
 }
 
@@ -39,7 +39,7 @@ function generateResetCode() {
 
 export async function register(req, res, next) {
   try {
-    const { name, email, password, chapter, teamDirector } = req.body;
+    const { name, email, password, chapter } = req.body;
     if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
         success: false,
@@ -58,12 +58,6 @@ export async function register(req, res, next) {
         message: "Please select a chapter.",
       });
     }
-    if (!teamDirector) {
-      return res.status(400).json({
-        success: false,
-        message: "Please select a director team.",
-      });
-    }
 
     const chapterDoc = await Chapter.findById(chapter);
     if (!chapterDoc) {
@@ -71,18 +65,6 @@ export async function register(req, res, next) {
     }
     if (chapterDoc.status && chapterDoc.status !== "active") {
       return res.status(400).json({ success: false, message: "Selected chapter is not active." });
-    }
-
-    const head = await User.findById(teamDirector).select("chapter chapterRole name");
-    if (
-      !head ||
-      String(head.chapter) !== String(chapterDoc._id) ||
-      !isTeamHeadRole(head.chapterRole)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Selected director team is invalid for this chapter.",
-      });
     }
 
     const existing = await User.findOne({ email: String(email).toLowerCase().trim() });
@@ -97,7 +79,8 @@ export async function register(req, res, next) {
       systemRole: "member",
       chapterRole: "member",
       chapter: chapterDoc._id,
-      teamDirector: head._id,
+      cabinetMember: null,
+      teamDirector: null,
     });
 
     await sendToken(user, 201, res);

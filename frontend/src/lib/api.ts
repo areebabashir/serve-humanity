@@ -21,6 +21,7 @@ export interface AuthUser {
   chapterRole?: string;
   chapter?: AuthChapter;
   teamDirector?: string | { _id: string; name?: string; email?: string; chapterRole?: string } | null;
+  cabinetMember?: string | { _id: string; name?: string; email?: string; chapterRole?: string } | null;
   avatar?: string;
   phone?: string;
   isActive?: boolean;

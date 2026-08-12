@@ -4,6 +4,7 @@ import {
   requireFullAccess,
   requireFullAccessOr,
   requireCeoDashboard,
+  requireSystemOrChapter,
 } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
 import {
@@ -15,6 +16,7 @@ import {
   createChapter,
   assignChapterPresident,
   updateChapter,
+  updateChapterDonationAccounts,
   updateChapterImage,
   deleteChapter,
   getChapterStats,
@@ -31,6 +33,15 @@ router.get("/:id", getChapter);
 router.post("/", protect, requireFullAccess, upload.single("image"), createChapter);
 router.patch("/:id/president", protect, requireFullAccess, assignChapterPresident);
 router.patch("/:id/image", protect, requireFullAccess, upload.single("image"), updateChapterImage);
+router.patch(
+  "/:id/donation-accounts",
+  protect,
+  requireSystemOrChapter({
+    system: ["president"],
+    chapter: ["president"],
+  }),
+  updateChapterDonationAccounts,
+);
 router.patch("/:id", protect, requireFullAccessOr("president"), updateChapter);
 router.delete("/:id", protect, requireFullAccess, deleteChapter);
 

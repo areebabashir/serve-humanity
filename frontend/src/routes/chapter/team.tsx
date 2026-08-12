@@ -3,11 +3,14 @@ import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { ChapterCard, ChapterPageHeader } from "@/components/chapter/ChapterPage";
 import {
-  canAssignChapterRoles,
+  CABINET_ASSIGNABLE_ROLES,
   CHAPTER_ROLE_LABEL,
-  DIRECTOR_ASSIGNABLE_ROLES,
+  canAssignChapterRoles,
+  canManageCabinetTeam,
+  idOfRef,
+  isCabinetRole,
   isOwnCollectionRole,
-  isTeamHeadRole,
+  isTeamDirectorRole,
   type ChapterRole,
 } from "@/lib/chapterRoles";
 import { api, ApiRequestError, type AuthUser } from "@/lib/api";
@@ -45,10 +48,8 @@ function roleLabel(role: string | undefined): string {
   return CHAPTER_ROLE_LABEL[role as ChapterRole] || role;
 }
 
-function directorIdOf(u: AuthUser): string {
-  if (!u.teamDirector) return "none";
-  if (typeof u.teamDirector === "string") return u.teamDirector;
-  return u.teamDirector._id || "none";
+function refId(u: AuthUser, key: "cabinetMember" | "teamDirector"): string {
+  return idOfRef(u[key]) || "none";
 }
 
 const emptyForm = {
@@ -63,36 +64,52 @@ const emptyForm = {
 export default function ChapterTeamPage() {
   const { user: me, refresh } = useAuth();
   const canAssign = canAssignChapterRoles(me);
+  const isCabinet = canManageCabinetTeam(me);
   const [rows, setRows] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  const directors = useMemo(
-    () => rows.filter((u) => isTeamHeadRole(u.chapterRole)),
+  const cabinetMembers = useMemo(
+    () => rows.filter((u) => isCabinetRole(u.chapterRole) && u.isActive !== false),
     [rows],
+  );
+
+  const myDirectors = useMemo(
+    () =>
+      rows.filter(
+        (u) =>
+          isTeamDirectorRole(u.chapterRole) &&
+          idOfRef(u.cabinetMember) === me?._id &&
+          u.isActive !== false,
+      ),
+    [rows, me?._id],
   );
 
   const takenRoles = useMemo(
     () =>
       new Set(
         rows
-          .filter((u) => u.isActive !== false && DIRECTOR_ASSIGNABLE_ROLES.includes((u.chapterRole as ChapterRole) || "member"))
+          .filter(
+            (u) =>
+              u.isActive !== false &&
+              CABINET_ASSIGNABLE_ROLES.includes((u.chapterRole as ChapterRole) || "member"),
+          )
           .map((u) => u.chapterRole as ChapterRole),
       ),
     [rows],
   );
 
   const availableRoles = useMemo(
-    () => DIRECTOR_ASSIGNABLE_ROLES.filter((r) => !takenRoles.has(r)),
+    () => CABINET_ASSIGNABLE_ROLES.filter((r) => !takenRoles.has(r)),
     [takenRoles],
   );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api<{ success: true; data: AuthUser[] }>("/users?limit=100");
+      const res = await api<{ success: true; data: AuthUser[] }>("/users?limit=200");
       setRows(res.data || []);
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : "Failed to load team");
@@ -122,7 +139,23 @@ export default function ChapterTeamPage() {
     }
   }
 
-  async function changeTeamDirector(userId: string, teamDirector: string) {
+  async function changeCabinet(userId: string, cabinetMember: string) {
+    try {
+      await api(`/users/${userId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          cabinetMember: cabinetMember === "none" ? null : cabinetMember,
+        }),
+      });
+      toast.success("Cabinet assignment updated");
+      await load();
+      if (userId === me?._id) await refresh();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Update failed");
+    }
+  }
+
+  async function changeDirector(userId: string, teamDirector: string) {
     try {
       await api(`/users/${userId}`, {
         method: "PATCH",
@@ -130,7 +163,7 @@ export default function ChapterTeamPage() {
           teamDirector: teamDirector === "none" ? null : teamDirector,
         }),
       });
-      toast.success("Team director updated");
+      toast.success("Director assignment updated");
       await load();
       if (userId === me?._id) await refresh();
     } catch (err) {
@@ -154,17 +187,30 @@ export default function ChapterTeamPage() {
     }
     setSaving(true);
     try {
-      await api("/users/chapter-directors", {
-        method: "POST",
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          password: form.password,
-          phone: form.phone.trim() || undefined,
-          chapterRole: form.chapterRole,
-        }),
-      });
-      toast.success("Director account created — share the email and password with them");
+      if (isCabinet && !canAssign) {
+        await api("/users/team-directors", {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.name.trim(),
+            email: form.email.trim(),
+            password: form.password,
+            phone: form.phone.trim() || undefined,
+          }),
+        });
+        toast.success("Director account created — share the email and password with them");
+      } else {
+        await api("/users/chapter-directors", {
+          method: "POST",
+          body: JSON.stringify({
+            name: form.name.trim(),
+            email: form.email.trim(),
+            password: form.password,
+            phone: form.phone.trim() || undefined,
+            chapterRole: form.chapterRole,
+          }),
+        });
+        toast.success("Account created — share the email and password with them");
+      }
       setForm(emptyForm);
       setOpen(false);
       await load();
@@ -175,17 +221,22 @@ export default function ChapterTeamPage() {
     }
   }
 
+  const canCreate = canAssign ? availableRoles.length > 0 : isCabinet;
+  const createLabel = canAssign ? "Add VP / cabinet" : "Add director";
+
   return (
     <div>
       <ChapterPageHeader
         title="Team & Roles"
         description={
           canAssign
-            ? "Create director accounts with a password, assign roles, and place members under a director team. President and VP have their own collection only — no team."
-            : "Chapter login accounts and their roles."
+            ? "Create Vice President and cabinet members. Assign registered members to a cabinet. Cabinet members then add directors and place members on those teams."
+            : isCabinet
+              ? "Add directors for your cabinet team, then assign your members to a director."
+              : "Chapter login accounts and their roles."
         }
         actions={
-          canAssign ? (
+          canCreate ? (
             <Dialog
               open={open}
               onOpenChange={(v) => {
@@ -196,16 +247,20 @@ export default function ChapterTeamPage() {
               }}
             >
               <DialogTrigger asChild>
-                <Button disabled={availableRoles.length === 0}>
+                <Button>
                   <UserPlus className="h-4 w-4" />
-                  Add director
+                  {createLabel}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md sm:rounded-2xl">
                 <DialogHeader>
-                  <DialogTitle>Add director account</DialogTitle>
+                  <DialogTitle>
+                    {canAssign ? "Add VP or cabinet member" : "Add director"}
+                  </DialogTitle>
                   <DialogDescription>
-                    Creates a chapter login. Share the email and password with the director.
+                    {canAssign
+                      ? "Creates a chapter login. One active seat per cabinet role."
+                      : "Creates a director under your cabinet. Share the email and password with them."}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onCreate} className="space-y-3">
@@ -236,26 +291,28 @@ export default function ChapterTeamPage() {
                       onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                     />
                   </div>
-                  <div>
-                    <Label>Role</Label>
-                    <Select
-                      value={form.chapterRole}
-                      onValueChange={(v) =>
-                        setForm((f) => ({ ...f, chapterRole: v as ChapterRole }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableRoles.map((r) => (
-                          <SelectItem key={r} value={r}>
-                            {CHAPTER_ROLE_LABEL[r]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {canAssign ? (
+                    <div>
+                      <Label>Role</Label>
+                      <Select
+                        value={form.chapterRole}
+                        onValueChange={(v) =>
+                          setForm((f) => ({ ...f, chapterRole: v as ChapterRole }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableRoles.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {CHAPTER_ROLE_LABEL[r]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                   <div>
                     <Label htmlFor="dir-password">Password</Label>
                     <Input
@@ -281,7 +338,7 @@ export default function ChapterTeamPage() {
                     />
                   </div>
                   <DialogFooter>
-                    <Button type="submit" disabled={saving || availableRoles.length === 0}>
+                    <Button type="submit" disabled={saving || (canAssign && availableRoles.length === 0)}>
                       {saving ? (
                         <>
                           <Loader2 className="h-4 w-4 animate-spin" /> Creating…
@@ -304,19 +361,20 @@ export default function ChapterTeamPage() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Director team</TableHead>
+              <TableHead>Cabinet</TableHead>
+              <TableHead>Director</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={5} className="text-muted-foreground">
                   <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground">
+                <TableCell colSpan={5} className="text-muted-foreground">
                   No users found for this chapter.
                 </TableCell>
               </TableRow>
@@ -328,10 +386,13 @@ export default function ChapterTeamPage() {
                 const ownCollectionOnly =
                   isTargetPresident || isOwnCollectionRole(u.chapterRole);
                 const canEditRole = canAssign && !isSelf && !isTargetPresident;
-                const canEditDirector =
-                  canAssign && !ownCollectionOnly && !isTeamHeadRole(u.chapterRole);
+                const isMember =
+                  u.chapterRole === "member" || u.chapterRole === "assistant_director";
+                const canEditCabinet = canAssign && isMember;
+                const inMyCabinet = idOfRef(u.cabinetMember) === me?._id;
+                const canEditDirector = isCabinet && !canAssign && isMember && inMyCabinet;
                 const current = (u.chapterRole as ChapterRole) || "member";
-                const selectValue = DIRECTOR_ASSIGNABLE_ROLES.includes(current)
+                const selectValue = CABINET_ASSIGNABLE_ROLES.includes(current)
                   ? current
                   : undefined;
 
@@ -350,11 +411,11 @@ export default function ChapterTeamPage() {
                           value={selectValue}
                           onValueChange={(v) => void changeRole(u._id, v)}
                         >
-                          <SelectTrigger className="w-[220px]">
+                          <SelectTrigger className="w-[240px]">
                             <SelectValue placeholder={roleLabel(current)} />
                           </SelectTrigger>
                           <SelectContent>
-                            {DIRECTOR_ASSIGNABLE_ROLES.map((r) => (
+                            {CABINET_ASSIGNABLE_ROLES.map((r) => (
                               <SelectItem key={r} value={r}>
                                 {CHAPTER_ROLE_LABEL[r]}
                               </SelectItem>
@@ -374,29 +435,63 @@ export default function ChapterTeamPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {ownCollectionOnly ? (
+                      {ownCollectionOnly || isCabinetRole(u.chapterRole) ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : isTeamDirectorRole(u.chapterRole) ? (
+                        <span className="text-xs text-muted-foreground">
+                          {typeof u.cabinetMember === "object" && u.cabinetMember?.name
+                            ? u.cabinetMember.name
+                            : "Your cabinet"}
+                        </span>
+                      ) : canEditCabinet ? (
+                        <Select
+                          value={refId(u, "cabinetMember")}
+                          onValueChange={(v) => void changeCabinet(u._id, v)}
+                        >
+                          <SelectTrigger className="w-[220px]">
+                            <SelectValue placeholder="Assign cabinet" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Unassigned</SelectItem>
+                            {cabinetMembers.map((c) => (
+                              <SelectItem key={c._id} value={c._id}>
+                                {c.name} · {roleLabel(c.chapterRole)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {typeof u.cabinetMember === "object" && u.cabinetMember?.name
+                            ? u.cabinetMember.name
+                            : "Unassigned"}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {ownCollectionOnly || isCabinetRole(u.chapterRole) ? (
                         <span className="text-xs text-muted-foreground">Own collection</span>
-                      ) : isTeamHeadRole(u.chapterRole) ? (
+                      ) : isTeamDirectorRole(u.chapterRole) ? (
                         <span className="text-xs text-muted-foreground">Leads this team</span>
                       ) : canEditDirector ? (
                         <Select
-                          value={directorIdOf(u)}
-                          onValueChange={(v) => void changeTeamDirector(u._id, v)}
+                          value={refId(u, "teamDirector")}
+                          onValueChange={(v) => void changeDirector(u._id, v)}
                         >
                           <SelectTrigger className="w-[220px]">
                             <SelectValue placeholder="Assign director" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Unassigned</SelectItem>
-                            {directors.map((d) => (
+                            {myDirectors.map((d) => (
                               <SelectItem key={d._id} value={d._id}>
-                                {d.name} ({roleLabel(d.chapterRole)})
+                                {d.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <span className="text-sm">
+                        <span className="text-xs text-muted-foreground">
                           {typeof u.teamDirector === "object" && u.teamDirector?.name
                             ? u.teamDirector.name
                             : "Unassigned"}

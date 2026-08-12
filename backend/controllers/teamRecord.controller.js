@@ -1,4 +1,15 @@
 import TeamRecord, { TEAM_RECORD_KINDS } from "../models/TeamRecord.js";
+import {
+  applySubmissionListScope,
+  belongsToTeamModule,
+  canEditSubmission,
+  canReadSubmission,
+  canReviewSubmission,
+  isBogUser,
+  isCabinetForModule,
+  isChapterLeadership,
+  resolveSubmissionOwnership,
+} from "../lib/submissionScope.js";
 
 const BOG_EDITORS = new Set([
   "ceo",
@@ -6,7 +17,12 @@ const BOG_EDITORS = new Set([
   "bog_operations",
   "bog_media",
 ]);
-const CHAPTER_LEADERSHIP = new Set(["president", "vice_president", "director"]);
+
+const KIND_MODULE = {
+  verification: "verification",
+  operation: "operations",
+  media: "media",
+};
 
 function chapterIdOf(user) {
   if (!user?.chapter) return null;
@@ -14,38 +30,22 @@ function chapterIdOf(user) {
 }
 
 function isBogEditor(user) {
-  return BOG_EDITORS.has(user?.systemRole);
+  return BOG_EDITORS.has(user?.systemRole) || isBogUser(user);
 }
 
-function isChapterAppUser(user) {
-  return user?.systemRole === "president" || user?.systemRole === "member";
+function moduleForKind(kind) {
+  return KIND_MODULE[kind] || null;
 }
 
-function canReadKind(user, kind) {
-  if (isBogEditor(user)) return true;
-  if (!isChapterAppUser(user)) return false;
-  if (user.systemRole === "president" || CHAPTER_LEADERSHIP.has(user.chapterRole)) return true;
-  if (kind === "verification") return user.chapterRole === "verification_head";
-  if (kind === "operation") return user.chapterRole === "operations_head";
-  if (kind === "media") return user.chapterRole === "media_head";
-  return (
-    user.chapterRole === "verification_head" ||
-    user.chapterRole === "operations_head" ||
-    user.chapterRole === "media_head"
-  );
+function canAccessKind(user, kind) {
+  const mod = moduleForKind(kind);
+  if (!mod) return false;
+  if (isBogEditor(user) || isChapterLeadership(user)) return true;
+  return belongsToTeamModule(user, mod);
 }
 
 function canWriteKind(user, kind) {
-  if (user?.systemRole === "ceo") return true;
-  if (kind === "verification" && user?.systemRole === "bog_verification") return true;
-  if (kind === "operation" && user?.systemRole === "bog_operations") return true;
-  if (kind === "media" && user?.systemRole === "bog_media") return true;
-  if (!isChapterAppUser(user)) return false;
-  if (user.systemRole === "president" || CHAPTER_LEADERSHIP.has(user.chapterRole)) return true;
-  if (kind === "verification") return user.chapterRole === "verification_head";
-  if (kind === "operation") return user.chapterRole === "operations_head";
-  if (kind === "media") return user.chapterRole === "media_head";
-  return false;
+  return canAccessKind(user, kind);
 }
 
 function applyChapterScope(filter, user) {
@@ -62,6 +62,15 @@ function sameChapter(user, docChapter) {
   return String(docChapter?._id || docChapter || "") === String(cid);
 }
 
+function populateTeamQuery(q) {
+  return q
+    .populate("chapter", "name city")
+    .populate("createdBy", "name email chapterRole")
+    .populate("updatedBy", "name email")
+    .populate("reviewedBy", "name email")
+    .populate("cabinetMember", "name email chapterRole");
+}
+
 async function nextSrNo(kind, chapterId) {
   const filter = { kind };
   if (chapterId) filter.chapter = chapterId;
@@ -73,42 +82,52 @@ async function nextSrNo(kind, chapterId) {
 
 export async function listTeamRecords(req, res, next) {
   try {
-    const { kind, chapter } = req.query;
+    const { kind, chapter, approvalStatus } = req.query;
     if (kind && !TEAM_RECORD_KINDS.includes(kind)) {
       return res.status(400).json({ success: false, message: "Invalid kind." });
     }
-    if (!canReadKind(req.user, kind || null)) {
+    if (kind && !canAccessKind(req.user, kind)) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
     const filter = applyChapterScope({}, req.user);
-    if (kind) filter.kind = kind;
-    if (chapter && isBogEditor(req.user)) filter.chapter = chapter;
-
-    if (
-      !kind &&
-      !isBogEditor(req.user) &&
-      !CHAPTER_LEADERSHIP.has(req.user.chapterRole) &&
-      req.user.systemRole !== "president"
-    ) {
-      if (req.user.chapterRole === "verification_head") filter.kind = "verification";
-      if (req.user.chapterRole === "operations_head") filter.kind = "operation";
-      if (req.user.chapterRole === "media_head") filter.kind = "media";
+    if (kind) {
+      filter.kind = kind;
+      applySubmissionListScope(filter, req.user, moduleForKind(kind));
+    } else if (!isBogEditor(req.user) && !isChapterLeadership(req.user)) {
+      const mod = moduleForKind(
+        req.user.chapterRole === "verification_head"
+          ? "verification"
+          : req.user.chapterRole === "operations_head"
+            ? "operation"
+            : req.user.chapterRole === "media_head"
+              ? "media"
+              : null,
+      ) || null;
+      if (mod) {
+        filter.kind =
+          mod === "operations" ? "operation" : mod === "verification" ? "verification" : "media";
+        applySubmissionListScope(filter, req.user, mod);
+      } else {
+        filter.createdBy = req.user._id;
+      }
     }
+    if (chapter && isBogEditor(req.user)) filter.chapter = chapter;
+    if (approvalStatus) filter.approvalStatus = approvalStatus;
 
     const sort =
-      kind === "verification" || kind === "media"
+      filter.kind === "verification" || filter.kind === "media"
         ? { srNo: 1, createdAt: 1 }
         : { createdAt: -1 };
 
-    const data = await TeamRecord.find(filter)
-      .populate("chapter", "name city")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email")
-      .sort(sort)
-      .lean();
+    const data = await populateTeamQuery(TeamRecord.find(filter).sort(sort)).lean();
 
-    res.json({ success: true, total: data.length, data });
+    res.json({
+      success: true,
+      total: data.length,
+      canReview: kind ? isCabinetForModule(req.user, moduleForKind(kind)) : false,
+      data,
+    });
   } catch (err) {
     next(err);
   }
@@ -123,6 +142,10 @@ export async function createTeamRecord(req, res, next) {
     if (!canWriteKind(req.user, kind)) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
+
+    const teamModule = moduleForKind(kind);
+    const ownership = await resolveSubmissionOwnership(req.user);
+    const cabinetCreates = isCabinetForModule(req.user, teamModule);
 
     let chapterId = null;
     if (isBogEditor(req.user)) {
@@ -141,6 +164,10 @@ export async function createTeamRecord(req, res, next) {
       kind,
       chapter: chapterId,
       notes: req.body.notes || "",
+      approvalStatus: cabinetCreates ? req.body.approvalStatus || "approved" : "pending",
+      teamModule,
+      cabinetMember: ownership.cabinetMember,
+      teamDirector: ownership.teamDirector,
       createdBy: req.user._id,
       updatedBy: req.user._id,
     };
@@ -168,10 +195,7 @@ export async function createTeamRecord(req, res, next) {
     }
 
     const doc = await TeamRecord.create(payload);
-    const populated = await TeamRecord.findById(doc._id)
-      .populate("chapter", "name city")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+    const populated = await populateTeamQuery(TeamRecord.findById(doc._id));
 
     res.status(201).json({ success: true, data: populated });
   } catch (err) {
@@ -184,8 +208,15 @@ export async function updateTeamRecord(req, res, next) {
     const doc = await TeamRecord.findById(req.params.id);
     if (!doc) return res.status(404).json({ success: false, message: "Record not found." });
 
+    const mod = moduleForKind(doc.kind);
     if (!canWriteKind(req.user, doc.kind) || !sameChapter(req.user, doc.chapter)) {
       return res.status(403).json({ success: false, message: "Access denied." });
+    }
+    if (!canEditSubmission(req.user, doc, mod)) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot edit this record (not yours or already approved).",
+      });
     }
 
     if (doc.kind === "verification") {
@@ -216,13 +247,14 @@ export async function updateTeamRecord(req, res, next) {
       }
     }
 
+    if (!isCabinetForModule(req.user, mod) && !isBogUser(req.user)) {
+      doc.approvalStatus = "pending";
+    }
+
     doc.updatedBy = req.user._id;
     await doc.save();
 
-    const populated = await TeamRecord.findById(doc._id)
-      .populate("chapter", "name city")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+    const populated = await populateTeamQuery(TeamRecord.findById(doc._id));
 
     res.json({ success: true, data: populated });
   } catch (err) {
@@ -235,12 +267,50 @@ export async function deleteTeamRecord(req, res, next) {
     const doc = await TeamRecord.findById(req.params.id);
     if (!doc) return res.status(404).json({ success: false, message: "Record not found." });
 
+    const mod = moduleForKind(doc.kind);
     if (!canWriteKind(req.user, doc.kind) || !sameChapter(req.user, doc.chapter)) {
       return res.status(403).json({ success: false, message: "Access denied." });
+    }
+    if (!canEditSubmission(req.user, doc, mod)) {
+      return res.status(403).json({ success: false, message: "You cannot delete this record." });
     }
 
     await TeamRecord.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Record deleted." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function reviewTeamRecord(req, res, next) {
+  try {
+    const doc = await TeamRecord.findById(req.params.id);
+    if (!doc) return res.status(404).json({ success: false, message: "Record not found." });
+
+    const mod = moduleForKind(doc.kind);
+    if (!canReviewSubmission(req.user, doc, mod)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only your cabinet member can approve pending submissions.",
+      });
+    }
+
+    const approvalStatus = req.body.approvalStatus === "rejected" ? "rejected" : "approved";
+    const updated = await populateTeamQuery(
+      TeamRecord.findByIdAndUpdate(
+        req.params.id,
+        {
+          approvalStatus,
+          reviewedBy: req.user._id,
+          reviewedAt: new Date(),
+          reviewNote: req.body.reviewNote || "",
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true },
+      ),
+    );
+
+    res.json({ success: true, data: updated });
   } catch (err) {
     next(err);
   }

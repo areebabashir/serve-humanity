@@ -13,6 +13,7 @@ import {
   getBoardMembers,
   createBogAccount,
   createChapterDirector,
+  createTeamDirector,
 } from "../controllers/user.controller.js";
 import { FULL_ACCESS_ROLES } from "../models/User.js";
 
@@ -32,11 +33,33 @@ router.post(
   createChapterDirector,
 );
 
+router.post(
+  "/team-directors",
+  requireSystemOrChapter({
+    chapter: [
+      "finance_head",
+      "operations_head",
+      "verification_head",
+      "documentation_head",
+      "media_head",
+    ],
+  }),
+  createTeamDirector,
+);
+
 router.get(
   "/",
   requireSystemOrChapter({
     system: [...FULL_ACCESS_ROLES, "president"],
-    chapter: ["president", "vice_president"],
+    chapter: [
+      "president",
+      "vice_president",
+      "finance_head",
+      "operations_head",
+      "verification_head",
+      "documentation_head",
+      "media_head",
+    ],
   }),
   getAllUsers,
 );

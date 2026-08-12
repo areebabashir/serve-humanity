@@ -1,20 +1,14 @@
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { Logo } from "@/components/site/Logo";
-import { Lock, Mail, User, Users, ArrowRight, Loader2, UserCog } from "lucide-react";
+import { Lock, Mail, User, Users, ArrowRight, Loader2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 import { api, ApiRequestError, type AuthUser } from "@/lib/api";
-import {
-  CHAPTER_ROLE_LABEL,
-  chapterHomeForUser,
-  isChapterAppUser,
-  type ChapterRole,
-} from "@/lib/chapterRoles";
+import { chapterHomeForUser, isChapterAppUser } from "@/lib/chapterRoles";
 
 type ChapterOption = { _id: string; name: string; city?: string; status?: string };
-type HeadOption = { _id: string; name: string; chapterRole: string };
 
 const CEO_DASHBOARD_URL = import.meta.env.VITE_CEO_DASHBOARD_URL || "http://localhost:5174";
 
@@ -43,14 +37,11 @@ export default function RegisterPage() {
   const { user, loading, register } = useAuth();
   const navigate = useNavigate();
   const [chapters, setChapters] = useState<ChapterOption[]>([]);
-  const [heads, setHeads] = useState<HeadOption[]>([]);
   const [chaptersLoading, setChaptersLoading] = useState(true);
-  const [headsLoading, setHeadsLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [chapter, setChapter] = useState("");
-  const [teamDirector, setTeamDirector] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -80,40 +71,11 @@ export default function RegisterPage() {
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    setTeamDirector("");
-    setHeads([]);
-    if (!chapter) return;
-    (async () => {
-      setHeadsLoading(true);
-      try {
-        const res = await api<{ success: true; data: HeadOption[] }>(`/chapters/${chapter}/heads`);
-        if (!cancelled) setHeads(res.data || []);
-      } catch {
-        if (!cancelled) setError("Unable to load director teams for this chapter.");
-      } finally {
-        if (!cancelled) setHeadsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [chapter]);
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     if (!chapter) {
       setError("Please select a chapter.");
-      return;
-    }
-    if (!teamDirector) {
-      setError("Please select your director team before registering.");
-      return;
-    }
-    if (heads.length === 0) {
-      setError("This chapter has no directors yet. Ask the president to assign heads first.");
       return;
     }
     if (password.length < 6) {
@@ -127,7 +89,6 @@ export default function RegisterPage() {
         email: email.trim(),
         password,
         chapter,
-        teamDirector,
       });
       navigate(chapterHomeForUser(loggedIn));
     } catch (err) {
@@ -163,7 +124,7 @@ export default function RegisterPage() {
             </div>
             <h1 className="mt-6 text-center font-display text-2xl font-bold">Create account</h1>
             <p className="mt-1 text-center text-sm text-muted-foreground">
-              Select chapter and director team first, then create your account
+              Select your chapter, then create your account. Leadership will assign you to a cabinet.
             </p>
             <form onSubmit={onSubmit} className="mt-8 space-y-4">
               <label className="block">
@@ -190,43 +151,6 @@ export default function RegisterPage() {
                     ))}
                   </select>
                 </div>
-              </label>
-
-              <label className="block">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Director team <span className="text-red-500">*</span>
-                </span>
-                <div className="relative mt-1">
-                  <UserCog className="absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <select
-                    required
-                    value={teamDirector}
-                    disabled={!chapter || headsLoading || heads.length === 0}
-                    onChange={(e) => setTeamDirector(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-border bg-secondary py-3 pl-11 pr-4 text-sm outline-none focus:border-brand-orange disabled:opacity-70"
-                  >
-                    <option value="">
-                      {!chapter
-                        ? "Select a chapter first"
-                        : headsLoading
-                          ? "Loading directors…"
-                          : heads.length === 0
-                            ? "No directors yet — ask president to assign heads"
-                            : "Select your director team"}
-                    </option>
-                    {heads.map((h) => (
-                      <option key={h._id} value={h._id}>
-                        {h.name} —{" "}
-                        {CHAPTER_ROLE_LABEL[h.chapterRole as ChapterRole] || h.chapterRole}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {chapter && !headsLoading && heads.length === 0 ? (
-                  <p className="mt-1.5 text-xs text-amber-700">
-                    Registration is blocked until this chapter has at least one director.
-                  </p>
-                ) : null}
               </label>
 
               <label className="block">
@@ -282,14 +206,7 @@ export default function RegisterPage() {
 
               <button
                 type="submit"
-                disabled={
-                  submitting ||
-                  chaptersLoading ||
-                  headsLoading ||
-                  !chapter ||
-                  !teamDirector ||
-                  heads.length === 0
-                }
+                disabled={submitting || chaptersLoading || !chapter}
                 className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-warm py-3.5 text-sm font-bold text-white shadow-warm transition hover:-translate-y-0.5 disabled:opacity-70"
               >
                 {submitting ? (

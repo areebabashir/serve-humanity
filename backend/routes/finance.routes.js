@@ -7,6 +7,7 @@ import {
   createFinance,
   updateFinance,
   deleteFinance,
+  reviewFinance,
   uploadFinanceAttachment,
   uploadFinanceExport,
   getFinanceStats,
@@ -22,6 +23,7 @@ router.post("/upload-export", upload.single("file"), uploadFinanceExport);
 router.get("/:id", getFinance);
 router.post("/", createFinance);
 router.patch("/:id", updateFinance);
+router.patch("/:id/review", reviewFinance);
 router.delete("/:id", deleteFinance);
 
 export default router;

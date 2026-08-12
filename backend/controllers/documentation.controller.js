@@ -1,8 +1,20 @@
 import DocumentationFile, { DOC_TYPES } from "../models/DocumentationFile.js";
 import { uploadToCloudinary } from "../middleware/upload.js";
 import { uploadDocumentationToDrive, googleDriveConfigured } from "../utils/googleDrive.js";
+import {
+  applySubmissionListScope,
+  belongsToTeamModule,
+  canEditSubmission,
+  canReadSubmission,
+  canReviewSubmission,
+  isBogUser,
+  isCabinetForModule,
+  isChapterLeadership,
+  resolveSubmissionOwnership,
+} from "../lib/submissionScope.js";
 
 const DOC_BOG = new Set(["ceo", "bog_documentation"]);
+const DOC_MODULE = "documentation";
 
 /** Regular case files managed on the Pending / Running / Complete board */
 export const CASE_DOC_TYPES = ["health", "marriage", "fee", "ration"];
@@ -20,8 +32,22 @@ function applyChapterScope(filter, user) {
   return filter;
 }
 
+function canAccessDocs(user) {
+  if (DOC_BOG.has(user?.systemRole) || isBogUser(user) || isChapterLeadership(user)) return true;
+  return belongsToTeamModule(user, DOC_MODULE);
+}
+
+function populateDocQuery(q) {
+  return q
+    .populate("chapter", "name city")
+    .populate("createdBy", "name email chapterRole")
+    .populate("updatedBy", "name email")
+    .populate("reviewedBy", "name email")
+    .populate("cabinetMember", "name email chapterRole");
+}
+
 function sameChapter(user, docChapter) {
-  if (DOC_BOG.has(user?.systemRole)) return true;
+  if (DOC_BOG.has(user?.systemRole) || isBogUser(user)) return true;
   const cid = chapterIdOf(user);
   if (!cid) return false;
   return String(docChapter?._id || docChapter || "") === String(cid);
@@ -29,8 +55,13 @@ function sameChapter(user, docChapter) {
 
 export async function listDocs(req, res, next) {
   try {
-    const { type, chapter, status, caseStatus, casesOnly, page = 1, limit = 30, q } = req.query;
+    if (!canAccessDocs(req.user)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    const { type, chapter, status, approvalStatus, caseStatus, casesOnly, page = 1, limit = 30, q } = req.query;
     const filter = applyChapterScope({}, req.user);
+    applySubmissionListScope(filter, req.user, DOC_MODULE);
     if (type) {
       filter.type = type;
     } else if (casesOnly === "1" || casesOnly === "true" || caseStatus) {
@@ -48,6 +79,7 @@ export async function listDocs(req, res, next) {
       }
     }
     if (status) filter.status = status;
+    if (approvalStatus) filter.approvalStatus = approvalStatus;
     if (q) {
       filter.$or = [
         { caseNumber: new RegExp(q, "i") },
@@ -59,17 +91,19 @@ export async function listDocs(req, res, next) {
 
     const skip = (Number(page) - 1) * Number(limit);
     const [data, total] = await Promise.all([
-      DocumentationFile.find(filter)
-        .skip(skip)
-        .limit(Number(limit))
-        .populate("chapter", "name city")
-        .populate("createdBy", "name email")
-        .populate("updatedBy", "name email")
-        .sort({ updatedAt: -1 }),
+      populateDocQuery(
+        DocumentationFile.find(filter).skip(skip).limit(Number(limit)).sort({ updatedAt: -1 }),
+      ),
       DocumentationFile.countDocuments(filter),
     ]);
 
-    res.json({ success: true, total, page: Number(page), data });
+    res.json({
+      success: true,
+      total,
+      page: Number(page),
+      canReview: isCabinetForModule(req.user, DOC_MODULE),
+      data,
+    });
   } catch (err) {
     next(err);
   }
@@ -77,12 +111,16 @@ export async function listDocs(req, res, next) {
 
 export async function getDoc(req, res, next) {
   try {
-    const doc = await DocumentationFile.findById(req.params.id)
-      .populate("chapter", "name city")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+    if (!canAccessDocs(req.user)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    const doc = await populateDocQuery(DocumentationFile.findById(req.params.id));
     if (!doc) return res.status(404).json({ success: false, message: "Document not found." });
     if (!sameChapter(req.user, doc.chapter)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+    if (!canReadSubmission(req.user, doc, DOC_MODULE)) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
     res.json({ success: true, data: doc });
@@ -93,6 +131,10 @@ export async function getDoc(req, res, next) {
 
 export async function createDoc(req, res, next) {
   try {
+    if (!canAccessDocs(req.user)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
     const { type, title, caseNumber, chapter, fields, attachments, notes, status, caseStatus } = req.body;
     if (!type || !DOC_TYPES.includes(type)) {
       return res.status(400).json({ success: false, message: "Valid document type is required." });
@@ -117,6 +159,9 @@ export async function createDoc(req, res, next) {
           ? "pending"
           : undefined;
 
+    const ownership = await resolveSubmissionOwnership(req.user);
+    const cabinetCreates = isCabinetForModule(req.user, DOC_MODULE);
+
     const doc = await DocumentationFile.create({
       type,
       title: title || "",
@@ -126,14 +171,16 @@ export async function createDoc(req, res, next) {
       attachments: attachments || [],
       notes: notes || "",
       status: status || "draft",
+      approvalStatus: cabinetCreates ? req.body.approvalStatus || "approved" : "pending",
+      teamModule: DOC_MODULE,
+      cabinetMember: ownership.cabinetMember,
+      teamDirector: ownership.teamDirector,
       ...(resolvedCaseStatus ? { caseStatus: resolvedCaseStatus } : {}),
       createdBy: req.user._id,
       updatedBy: req.user._id,
     });
 
-    const populated = await DocumentationFile.findById(doc._id)
-      .populate("chapter", "name city")
-      .populate("createdBy", "name email");
+    const populated = await populateDocQuery(DocumentationFile.findById(doc._id));
 
     res.status(201).json({ success: true, data: populated });
   } catch (err) {
@@ -143,10 +190,20 @@ export async function createDoc(req, res, next) {
 
 export async function updateDoc(req, res, next) {
   try {
+    if (!canAccessDocs(req.user)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
     const existing = await DocumentationFile.findById(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: "Document not found." });
     if (!sameChapter(req.user, existing.chapter)) {
       return res.status(403).json({ success: false, message: "Access denied." });
+    }
+    if (!canEditSubmission(req.user, existing, DOC_MODULE)) {
+      return res.status(403).json({
+        success: false,
+        message: "You cannot edit this record (not yours or already approved).",
+      });
     }
 
     const allowed = ["title", "caseNumber", "chapter", "fields", "attachments", "notes", "status", "caseStatus"];
@@ -160,17 +217,19 @@ export async function updateDoc(req, res, next) {
         message: "caseStatus must be pending, running, or complete.",
       });
     }
-    if (!DOC_BOG.has(req.user.systemRole)) {
+    if (!DOC_BOG.has(req.user.systemRole) && !isBogUser(req.user)) {
       updates.chapter = chapterIdOf(req.user);
     }
+    if (!isCabinetForModule(req.user, DOC_MODULE) && !isBogUser(req.user)) {
+      updates.approvalStatus = "pending";
+    }
 
-    const doc = await DocumentationFile.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-      runValidators: true,
-    })
-      .populate("chapter", "name city")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+    const doc = await populateDocQuery(
+      DocumentationFile.findByIdAndUpdate(req.params.id, updates, {
+        new: true,
+        runValidators: true,
+      }),
+    );
 
     if (!doc) return res.status(404).json({ success: false, message: "Document not found." });
     res.json({ success: true, data: doc });
@@ -181,13 +240,58 @@ export async function updateDoc(req, res, next) {
 
 export async function deleteDoc(req, res, next) {
   try {
+    if (!canAccessDocs(req.user)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
     const existing = await DocumentationFile.findById(req.params.id);
     if (!existing) return res.status(404).json({ success: false, message: "Document not found." });
     if (!sameChapter(req.user, existing.chapter)) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
+    if (!canEditSubmission(req.user, existing, DOC_MODULE)) {
+      return res.status(403).json({ success: false, message: "You cannot delete this record." });
+    }
     await DocumentationFile.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Document deleted." });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function reviewDoc(req, res, next) {
+  try {
+    if (!canAccessDocs(req.user)) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    const existing = await DocumentationFile.findById(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, message: "Document not found." });
+
+    if (!canReviewSubmission(req.user, existing, DOC_MODULE)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only your cabinet member can approve pending documentation.",
+      });
+    }
+
+    const approvalStatus = req.body.approvalStatus === "rejected" ? "rejected" : "approved";
+    const doc = await populateDocQuery(
+      DocumentationFile.findByIdAndUpdate(
+        req.params.id,
+        {
+          approvalStatus,
+          reviewedBy: req.user._id,
+          reviewedAt: new Date(),
+          reviewNote: req.body.reviewNote || "",
+          status: approvalStatus === "approved" ? "reviewed" : existing.status,
+          updatedBy: req.user._id,
+        },
+        { new: true, runValidators: true },
+      ),
+    );
+
+    res.json({ success: true, data: doc });
   } catch (err) {
     next(err);
   }
@@ -255,8 +359,19 @@ export async function uploadDocPdf(req, res, next) {
     // Skip duplicate if this document already has a Drive PDF
     if (docId) {
       const existing = await DocumentationFile.findById(docId).select(
-        "pdfDriveFileId pdfDriveWebViewLink pdfDrivePath pdfDriveUploadedAt",
+        "pdfDriveFileId pdfDriveWebViewLink pdfDrivePath pdfDriveUploadedAt approvalStatus",
       );
+      if (
+        existing &&
+        !isCabinetForModule(req.user, DOC_MODULE) &&
+        !isBogUser(req.user) &&
+        existing.approvalStatus !== "approved"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Cabinet must approve this document before PDF can be synced to Drive.",
+        });
+      }
       if (existing?.pdfDriveFileId) {
         return res.status(200).json({
           success: true,

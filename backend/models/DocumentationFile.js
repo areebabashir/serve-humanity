@@ -60,6 +60,32 @@ const documentationFileSchema = new mongoose.Schema(
       enum: ["draft", "submitted", "reviewed", "archived"],
       default: "draft",
     },
+    approvalStatus: {
+      type: String,
+      enum: ["draft", "pending", "approved", "rejected"],
+      default: "pending",
+      index: true,
+    },
+    teamModule: {
+      type: String,
+      enum: ["finance", "operations", "verification", "documentation", "media", ""],
+      default: "documentation",
+      index: true,
+    },
+    cabinetMember: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
+    },
+    teamDirector: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewNote: { type: String, default: "" },
     /** Case board lifecycle for health / marriage / fee / ration */
     caseStatus: {
       type: String,

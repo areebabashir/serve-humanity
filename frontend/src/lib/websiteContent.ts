@@ -324,7 +324,7 @@ export const LOCAL_WEBSITE_DEFAULTS: Record<string, Record<string, unknown>> = {
     },
     cta: "Donate now",
     causes: ["General", "Food", "Education", "Healthcare", "Orphans", "Water"],
-    note: "92% of donations go directly to programs.",
+    note: "",
     bankAccount: {
       bankName: "Serve Humanity Official Account",
       accountTitle: "Serve Humanity",
@@ -402,14 +402,45 @@ function mergeSections(
   return merged;
 }
 
+const OFFLINE_CACHE_PREFIX = "sh_offline_cache:";
+
+/** Last successful DB snapshot — used when API / internet is unavailable. */
+export function readOfflineCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(`${OFFLINE_CACHE_PREFIX}${key}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+export function writeOfflineCache(key: string, data: unknown): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(`${OFFLINE_CACHE_PREFIX}${key}`, JSON.stringify(data));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
 /** Fetch one published page. Set `dbOnly` to skip local dummy defaults (use CMS/DB only). */
 export function useWebsitePage<T extends Record<string, unknown> = Record<string, unknown>>(
   page: WebsitePageKey,
   options?: { dbOnly?: boolean },
 ) {
   const dbOnly = options?.dbOnly === true;
-  const fallback = (dbOnly ? {} : LOCAL_WEBSITE_DEFAULTS[page] || {}) as T;
-  const [sections, setSections] = useState<T>((dbOnly ? {} : fallback) as T);
+  const codeDefaults = (dbOnly ? {} : LOCAL_WEBSITE_DEFAULTS[page] || {}) as T;
+  const cacheKey = `website:${page}`;
+
+  const [sections, setSections] = useState<T>(() => {
+    const cached = readOfflineCache<Record<string, unknown>>(cacheKey);
+    if (cached && typeof cached === "object") {
+      return (dbOnly ? cached : mergeSections(codeDefaults as Record<string, unknown>, cached)) as T;
+    }
+    return codeDefaults;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -421,10 +452,22 @@ export function useWebsitePage<T extends Record<string, unknown> = Record<string
       .then((res) => {
         if (cancelled) return;
         const remote = (res.data?.sections ?? {}) as Record<string, unknown>;
-        setSections((dbOnly ? remote : mergeSections(fallback as Record<string, unknown>, remote)) as T);
+        // Persist DB snapshot as offline/dummy data for next visit
+        writeOfflineCache(cacheKey, remote);
+        setSections(
+          (dbOnly ? remote : mergeSections(codeDefaults as Record<string, unknown>, remote)) as T,
+        );
       })
       .catch(() => {
-        if (!cancelled) setSections(fallback);
+        if (cancelled) return;
+        const cached = readOfflineCache<Record<string, unknown>>(cacheKey);
+        if (cached && typeof cached === "object") {
+          setSections(
+            (dbOnly ? cached : mergeSections(codeDefaults as Record<string, unknown>, cached)) as T,
+          );
+        } else {
+          setSections(codeDefaults);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -437,3 +480,4 @@ export function useWebsitePage<T extends Record<string, unknown> = Record<string
 
   return { sections, loading };
 }
+

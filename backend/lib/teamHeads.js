@@ -1,8 +1,11 @@
 /**
- * Head roles = team directors (have a team collection members roll into).
- * President and vice president do NOT have a team — only their own collection.
+ * Chapter hierarchy:
+ * President / VP
+ *   └── Cabinet (finance, ops, verification, documentation, media)
+ *         └── Directors (team collection)
+ *               └── Members
  */
-export const TEAM_HEAD_ROLES = [
+export const CABINET_ROLES = [
   "operations_head",
   "verification_head",
   "media_head",
@@ -10,11 +13,32 @@ export const TEAM_HEAD_ROLES = [
   "documentation_head",
 ];
 
+/** @deprecated alias — cabinet seats (legacy name "team heads") */
+export const TEAM_HEAD_ROLES = CABINET_ROLES;
+
+export function isCabinetRole(role) {
+  return CABINET_ROLES.includes(role);
+}
+
+/** @deprecated use isCabinetRole */
 export function isTeamHeadRole(role) {
-  return TEAM_HEAD_ROLES.includes(role);
+  return isCabinetRole(role);
+}
+
+/** Directors under a cabinet member — own a team collection */
+export function isTeamDirectorRole(role) {
+  return role === "director";
+}
+
+/** Valid donation rollup targets: directors (preferred) or legacy cabinet assignments */
+export function isValidTeamLeadRole(role) {
+  return isTeamDirectorRole(role) || isCabinetRole(role);
 }
 
 /** Leadership with personal donations only (no director team). */
 export function isOwnCollectionRole(role) {
   return role === "president" || role === "vice_president";
 }
+
+/** Roles president / VP may create / assign as seats */
+export const CABINET_ASSIGNABLE_ROLES = ["vice_president", ...CABINET_ROLES];
