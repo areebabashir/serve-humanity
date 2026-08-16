@@ -289,17 +289,22 @@ function Hero({ sections }: { sections: HomeSections }) {
               <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
             </Link>
             <Link
-              to={hero.secondaryCtaLink || "/volunteer"}
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-6 py-3.5 text-sm font-semibold text-foreground shadow-soft transition-all hover:-translate-y-0.5 hover:border-brand-blue hover:text-brand-blue"
+              to="/volunteer"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-6 py-3.5 text-sm font-semibold text-foreground shadow-soft transition-all hover:-translate-y-0.5 hover:border-brand-orange hover:text-brand-orange"
             >
-              <HandHeart className="h-4 w-4" />
-              {hero.secondaryCta || "Become Volunteer"}
+              <FileCheck className="h-4 w-4" />
+              Need Support
             </Link>
-           
+            {hero.secondaryCtaLink && hero.secondaryCtaLink !== "/volunteer" ? (
+              <Link
+                to={hero.secondaryCtaLink}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-6 py-3.5 text-sm font-semibold text-foreground shadow-soft transition-all hover:-translate-y-0.5 hover:border-brand-blue hover:text-brand-blue"
+              >
+                <HandHeart className="h-4 w-4" />
+                {hero.secondaryCta || "Learn more"}
+              </Link>
+            ) : null}
           </motion.div>
-
-          {/* trust row */}
-          
         </div>
 
         {/* Right — glass dashboard */}
@@ -354,7 +359,6 @@ function Hero({ sections }: { sections: HomeSections }) {
 function About({ sections }: { sections: HomeSections }) {
   const story = sections.story ?? {};
   const points = (story.points ?? []).filter(Boolean);
-  const sideStats = story.sideStats ?? [];
   const title = story.title || "A decade of turning";
   const highlight = story.titleHighlight || "compassion into action";
 
@@ -408,13 +412,10 @@ function About({ sections }: { sections: HomeSections }) {
                 </blockquote>
                 <p className="mt-4 text-sm text-white/70">{story.quoteAttr}</p>
               </div>
-              <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-6">
-                {sideStats.map((s) => (
-                  <div key={s.label}>
-                    <div className="font-display text-3xl font-bold">{s.value}</div>
-                    <div className="text-[11px] uppercase tracking-widest text-white/60">{s.label}</div>
-                  </div>
-                ))}
+              <div className="border-t border-white/10 pt-6 text-center">
+                <p className="font-display text-2xl font-semibold italic tracking-wide text-white/95 md:text-3xl">
+                  Heart that Serves
+                </p>
               </div>
             </div>
           </div>
@@ -697,7 +698,7 @@ function Chapters({ sections }: { sections: HomeSections }) {
                       <div className="font-display text-2xl font-bold">{current.members}</div>
                     </div>
                     <div className="rounded-2xl bg-secondary p-4">
-                      <div className="text-xs text-muted-foreground">Projects</div>
+                      <div className="text-xs text-muted-foreground">Cases</div>
                       <div className="font-display text-2xl font-bold">{current.projects}</div>
                     </div>
                   </div>

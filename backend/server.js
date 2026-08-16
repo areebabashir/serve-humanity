@@ -36,6 +36,7 @@ import reviewRoutes from "./routes/review.routes.js";
 import websiteEventRoutes from "./routes/websiteEvent.routes.js";
 import newsletterRoutes from "./routes/newsletter.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import caseReferralRoutes from "./routes/caseReferral.routes.js";
 import { startDonationReminderScheduler } from "./jobs/donationReminders.js";
 
 
@@ -137,6 +138,7 @@ app.use(`${API}/reviews`, reviewRoutes);
 app.use(`${API}/website-events`, websiteEventRoutes);
 app.use(`${API}/newsletter`, newsletterRoutes);
 app.use(`${API}/dashboard`, dashboardRoutes);
+app.use(`${API}/case-referrals`, caseReferralRoutes);
 
 
 // 404 + error handler

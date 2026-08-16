@@ -1,6 +1,13 @@
 import mongoose from "mongoose";
 
-export const NOTIFICATION_AUDIENCES = ["bogs", "bogs_presidents", "all_members", "warning"];
+export const NOTIFICATION_AUDIENCES = [
+  "bogs",
+  "bogs_presidents",
+  "all_members",
+  "warning",
+  "chapter_referral",
+  "chapter_join",
+];
 export const NOTIFICATION_PRIORITIES = ["normal", "high", "urgent"];
 
 const recipientSchema = new mongoose.Schema(

@@ -1,6 +1,6 @@
 /**
  * Chapter dashboard hierarchy:
- * President (Male) / Vice President (Female)
+ * President (Male) / Vice President (Female) / Vice President (Male)
  *   → Cabinet Members (Finance, Ops, Verification, Documentation, Media)
  *     → Directors (team collection)
  *       → Members
@@ -9,6 +9,7 @@
 export type ChapterRole =
   | "president"
   | "vice_president"
+  | "vice_president_male"
   | "finance_head"
   | "operations_head"
   | "verification_head"
@@ -25,6 +26,7 @@ export type ChapterRole =
 export const CHAPTER_ROLE_LABEL: Record<ChapterRole, string> = {
   president: "President (Male)",
   vice_president: "Vice President (Female)",
+  vice_president_male: "Vice President (Male)",
   finance_head: "Cabinet — Finance",
   operations_head: "Cabinet — Operations",
   verification_head: "Cabinet — Verification",
@@ -39,6 +41,15 @@ export const CHAPTER_ROLE_LABEL: Record<ChapterRole, string> = {
   member: "Member",
 };
 
+/** Teams shown on public registration */
+export const JOINABLE_TEAMS: { value: ChapterRole; label: string }[] = [
+  { value: "verification_head", label: "Verification" },
+  { value: "operations_head", label: "Operations" },
+  { value: "documentation_head", label: "Documentation" },
+  { value: "finance_head", label: "Finance" },
+  { value: "media_head", label: "Media & Graphics" },
+];
+
 /** Cabinet seats under President / VP */
 export const CABINET_ROLES: ChapterRole[] = [
   "operations_head",
@@ -51,11 +62,10 @@ export const CABINET_ROLES: ChapterRole[] = [
 /** @deprecated alias for CABINET_ROLES */
 export const TEAM_HEAD_ROLES = CABINET_ROLES;
 
+export const VP_ROLES: ChapterRole[] = ["vice_president", "vice_president_male"];
+
 /** Roles president / VP can create (VP + cabinet seats). */
-export const CABINET_ASSIGNABLE_ROLES: ChapterRole[] = [
-  "vice_president",
-  ...CABINET_ROLES,
-];
+export const CABINET_ASSIGNABLE_ROLES: ChapterRole[] = [...VP_ROLES, ...CABINET_ROLES];
 
 /** @deprecated use CABINET_ASSIGNABLE_ROLES */
 export const DIRECTOR_ASSIGNABLE_ROLES = CABINET_ASSIGNABLE_ROLES;
@@ -64,6 +74,10 @@ export const PRESIDENT_ASSIGNABLE_ROLES = CABINET_ASSIGNABLE_ROLES;
 
 export function isCabinetRole(role: string | null | undefined): boolean {
   return Boolean(role && (CABINET_ROLES as string[]).includes(role));
+}
+
+export function isVicePresidentRole(role: string | null | undefined): boolean {
+  return Boolean(role && (VP_ROLES as string[]).includes(role));
 }
 
 /** @deprecated use isCabinetRole */
@@ -81,7 +95,7 @@ export function isValidTeamLeadRole(role: string | null | undefined): boolean {
 
 /** President / VP — personal donations only, no team. */
 export function isOwnCollectionRole(role: string | null | undefined): boolean {
-  return role === "president" || role === "vice_president";
+  return role === "president" || isVicePresidentRole(role);
 }
 
 export function canAssignChapterRoles(user: {
@@ -90,7 +104,7 @@ export function canAssignChapterRoles(user: {
 } | null | undefined): boolean {
   if (!user) return false;
   if (user.systemRole === "president" || user.chapterRole === "president") return true;
-  return user.chapterRole === "vice_president";
+  return isVicePresidentRole(user.chapterRole);
 }
 
 export function canManageCabinetTeam(user: {
@@ -98,6 +112,16 @@ export function canManageCabinetTeam(user: {
   chapterRole?: string | null;
 } | null | undefined): boolean {
   if (!user) return false;
+  return isCabinetRole(user.chapterRole);
+}
+
+export function canReviewJoinRequests(user: {
+  systemRole?: string;
+  chapterRole?: string | null;
+} | null | undefined): boolean {
+  if (!user) return false;
+  if (user.systemRole === "president" || user.chapterRole === "president") return true;
+  if (isVicePresidentRole(user.chapterRole)) return true;
   return isCabinetRole(user.chapterRole);
 }
 
@@ -113,6 +137,7 @@ const LEADERSHIP_MODULES = [
   "operations",
   "media",
   "documentation",
+  "case-registrations",
   "reports",
   "notifications",
   "profile",
@@ -124,6 +149,7 @@ const CABINET_BASE = ["overview", "team", "notifications", "profile"] as const;
 export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
   president: [...LEADERSHIP_MODULES],
   vice_president: [...LEADERSHIP_MODULES],
+  vice_president_male: [...LEADERSHIP_MODULES],
   director: ["overview", "team-collection", "notifications", "profile"],
   finance_head: [
     ...CABINET_BASE,
@@ -131,8 +157,8 @@ export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
     "director-donations",
   ],
   operations_head: [...CABINET_BASE, "ops", "operations", "director-donations"],
-  verification_head: [...CABINET_BASE, "ops", "verification", "director-donations"],
-  documentation_head: [...CABINET_BASE, "documentation", "director-donations"],
+  verification_head: [...CABINET_BASE, "ops", "verification", "director-donations", "case-registrations"],
+  documentation_head: [...CABINET_BASE, "documentation", "director-donations", "case-registrations"],
   media_head: [...CABINET_BASE, "media", "director-donations"],
   it_head: ["my-donation", "notifications", "profile"],
   hr_head: ["my-donation", "notifications", "profile"],
@@ -146,11 +172,12 @@ export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
 export const CHAPTER_WRITE: Record<ChapterRole, string[]> = {
   president: [...LEADERSHIP_MODULES],
   vice_president: [...LEADERSHIP_MODULES],
+  vice_president_male: [...LEADERSHIP_MODULES],
   director: ["team-collection"],
   finance_head: ["team", "finance", "director-donations"],
   operations_head: ["team", "operations", "ops"],
-  verification_head: ["team", "verification", "ops"],
-  documentation_head: ["team", "documentation"],
+  verification_head: ["team", "verification", "ops", "case-registrations"],
+  documentation_head: ["team", "documentation", "case-registrations"],
   media_head: ["team", "media"],
   it_head: ["my-donation"],
   hr_head: ["my-donation"],
@@ -268,7 +295,7 @@ export function canWriteChapterModule(role: ChapterRole, module: string): boolea
 }
 
 export function isChapterLeadership(role: ChapterRole): boolean {
-  return role === "president" || role === "vice_president" || isCabinetRole(role);
+  return role === "president" || isVicePresidentRole(role) || isCabinetRole(role);
 }
 
 export function isChapterAppUser(systemRole: string | undefined | null): boolean {
@@ -290,6 +317,7 @@ export function isPlainMember(role: ChapterRole): boolean {
 export const CHAPTER_ROLE_HOME: Record<ChapterRole, string> = {
   president: "/chapter",
   vice_president: "/chapter",
+  vice_president_male: "/chapter",
   director: "/chapter/team-collection",
   finance_head: "/chapter/director-donations",
   operations_head: "/chapter/operations",

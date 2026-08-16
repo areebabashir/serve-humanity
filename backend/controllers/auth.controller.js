@@ -1,9 +1,18 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import User from "../models/User.js";
+import User, { JOINABLE_CABINET_ROLES } from "../models/User.js";
 import Chapter from "../models/Chapter.js";
+import Notification from "../models/Notification.js";
 import { sendEmail } from "../utils/email.js";
-import { buildPasswordResetEmail } from "../utils/emailTemplates.js";
+import { buildPasswordResetEmail, buildNotificationEmailTemplate } from "../utils/emailTemplates.js";
+
+const TEAM_LABEL = {
+  operations_head: "Operations",
+  verification_head: "Verification",
+  media_head: "Media & Graphics",
+  finance_head: "Finance",
+  documentation_head: "Documentation",
+};
 
 function signToken(id) {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || "7d" });
@@ -37,9 +46,40 @@ function generateResetCode() {
   return String(crypto.randomInt(100000, 1000000));
 }
 
+async function findJoinApprovers(chapterId, requestedCabinetRole) {
+  const roles = ["president", "vice_president", "vice_president_male"];
+  if (requestedCabinetRole) roles.push(requestedCabinetRole);
+
+  const byId = new Map();
+
+  const roleMatches = await User.find({
+    chapter: chapterId,
+    isActive: { $ne: false },
+    membershipStatus: { $ne: "pending" },
+    chapterRole: { $in: roles },
+  })
+    .select("name email chapterRole systemRole")
+    .lean();
+
+  for (const u of roleMatches) byId.set(String(u._id), u);
+
+  const presidents = await User.find({
+    chapter: chapterId,
+    systemRole: "president",
+    isActive: { $ne: false },
+    membershipStatus: { $ne: "pending" },
+  })
+    .select("name email chapterRole systemRole")
+    .lean();
+
+  for (const u of presidents) byId.set(String(u._id), u);
+
+  return [...byId.values()];
+}
+
 export async function register(req, res, next) {
   try {
-    const { name, email, password, chapter } = req.body;
+    const { name, email, password, chapter, team, requestedCabinetRole } = req.body;
     if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
         success: false,
@@ -56,6 +96,15 @@ export async function register(req, res, next) {
       return res.status(400).json({
         success: false,
         message: "Please select a chapter.",
+      });
+    }
+
+    const cabinetRole = String(requestedCabinetRole || team || "").trim();
+    if (!JOINABLE_CABINET_ROLES.includes(cabinetRole)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please select a team (Verification, Operations, Documentation, Finance, or Media).",
       });
     }
 
@@ -81,9 +130,84 @@ export async function register(req, res, next) {
       chapter: chapterDoc._id,
       cabinetMember: null,
       teamDirector: null,
+      membershipStatus: "pending",
+      requestedCabinetRole: cabinetRole,
+      isActive: true,
     });
 
-    await sendToken(user, 201, res);
+    const teamLabel = TEAM_LABEL[cabinetRole] || cabinetRole;
+    const approvers = await findJoinApprovers(chapterDoc._id, cabinetRole);
+
+    const notifTitle = `New member join request — ${chapterDoc.name}`;
+    const notifBody = [
+      `${user.name} (${user.email}) requested to join the ${teamLabel} team.`,
+      `Chapter: ${chapterDoc.name}${chapterDoc.city ? ` (${chapterDoc.city})` : ""}.`,
+      `Open Team & Roles to approve or reject. Until approved, they cannot log in.`,
+    ].join("\n");
+
+    if (approvers.length > 0) {
+      const notification = await Notification.create({
+        title: notifTitle,
+        body: notifBody,
+        audience: "chapter_join",
+        priority: "high",
+        chapter: chapterDoc._id,
+        createdBy: user._id,
+        recipients: approvers.map((u) => ({
+          user: u._id,
+          email: u.email || "",
+          readAt: null,
+          dismissedAt: null,
+          emailedAt: null,
+          emailError: null,
+        })),
+      });
+
+      for (let i = 0; i < notification.recipients.length; i++) {
+        const recipient = notification.recipients[i];
+        const approver = approvers[i];
+        if (!approver?.email?.trim()) {
+          recipient.emailError = "No email on file";
+          continue;
+        }
+        try {
+          const mail = buildNotificationEmailTemplate({
+            title: notifTitle,
+            body: notifBody,
+            priority: "high",
+            recipientName: approver.name,
+          });
+          const result = await sendEmail({
+            to: approver.email,
+            subject: mail.subject,
+            html: mail.html,
+            text: mail.text,
+          });
+          if (result) {
+            recipient.emailedAt = new Date();
+            recipient.emailError = null;
+          } else {
+            recipient.emailError = "SMTP not configured";
+          }
+        } catch (err) {
+          recipient.emailError = err?.message || "Failed to send email";
+        }
+      }
+      await notification.save();
+    }
+
+    res.status(201).json({
+      success: true,
+      pendingApproval: true,
+      message:
+        "Registration submitted. The chapter president, vice presidents, and that team's cabinet head must approve before you can log in.",
+      data: {
+        email: user.email,
+        chapter: { _id: chapterDoc._id, name: chapterDoc.name, city: chapterDoc.city },
+        team: teamLabel,
+        requestedCabinetRole: cabinetRole,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -103,6 +227,21 @@ export async function login(req, res, next) {
       return res.status(403).json({
         success: false,
         message: "This account has been deactivated. Contact your organization admin.",
+      });
+    }
+
+    if (user.membershipStatus === "pending") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Your join request is still pending. The chapter president, vice presidents, or your team's cabinet head must approve it before you can log in.",
+      });
+    }
+
+    if (user.membershipStatus === "rejected") {
+      return res.status(403).json({
+        success: false,
+        message: "Your join request was rejected. Contact your chapter leadership for help.",
       });
     }
 

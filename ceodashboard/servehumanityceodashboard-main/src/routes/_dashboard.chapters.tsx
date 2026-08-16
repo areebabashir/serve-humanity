@@ -81,6 +81,7 @@ type TeamUser = {
   isActive?: boolean;
   lastLogin?: string | null;
   teamDirector?: { _id: string; name: string; chapterRole?: string } | null;
+  cabinetMember?: { _id?: string; name?: string; chapterRole?: string } | null;
 };
 
 type MemberRow = {
@@ -202,6 +203,30 @@ function ChaptersPage() {
   const [deleteTarget, setDeleteTarget] = useState<ChapterRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [memberDetailOpen, setMemberDetailOpen] = useState(false);
+  const [memberDetailLoading, setMemberDetailLoading] = useState(false);
+  const [memberDetail, setMemberDetail] = useState<{
+    user: TeamUser & {
+      createdAt?: string;
+      chapter?: { name?: string; city?: string } | null;
+      cabinetMember?: { name?: string } | null;
+    };
+    donations: Array<{
+      _id: string;
+      amount: number;
+      status: string;
+      createdAt: string;
+      teamDirector?: { name?: string } | null;
+    }>;
+    donationTotals: {
+      pending: number;
+      verified: number;
+      rejected: number;
+      count: number;
+      grandTotal: number;
+    };
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -255,6 +280,45 @@ function ChaptersPage() {
       setDetailChapterId(null);
     } finally {
       setDetailLoading(false);
+    }
+  }
+
+  async function openMemberDetail(userId: string) {
+    setMemberDetailOpen(true);
+    setMemberDetailLoading(true);
+    setMemberDetail(null);
+    try {
+      const res = await api<{
+        success: true;
+        data: NonNullable<typeof memberDetail>;
+      }>(`/users/${userId}/chapter-detail`);
+      setMemberDetail(res.data);
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to load member");
+      setMemberDetailOpen(false);
+    } finally {
+      setMemberDetailLoading(false);
+    }
+  }
+
+  async function deleteTeamUser(u: TeamUser) {
+    if (
+      !window.confirm(
+        `Delete account for ${u.name}${u.email ? ` (${u.email})` : ""}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingUserId(u._id);
+    try {
+      await api(`/users/${u._id}`, { method: "DELETE" });
+      toast.success("Account deleted");
+      if (detailChapterId) await refreshDetails(detailChapterId);
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to delete account");
+    } finally {
+      setDeletingUserId(null);
     }
   }
 
@@ -975,7 +1039,13 @@ function ChaptersPage() {
                             return (
                               <TableRow key={u._id}>
                                 <TableCell className="font-medium">
-                                  {u.name}
+                                  <button
+                                    type="button"
+                                    className="text-left text-primary underline-offset-2 hover:underline"
+                                    onClick={() => void openMemberDetail(u._id)}
+                                  >
+                                    {u.name}
+                                  </button>
                                   {u.isActive === false ? (
                                     <Badge variant="secondary" className="ml-2">
                                       Inactive
@@ -990,31 +1060,49 @@ function ChaptersPage() {
                                 <TableCell>{u.teamDirector?.name || "—"}</TableCell>
                                 {isCeo ? (
                                   <TableCell className="text-right">
-                                    {isCurrentPresident ? (
-                                      <span className="text-xs text-muted-foreground">Current president</span>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={presidentActionLoading}
-                                        onClick={() => {
-                                          if (
-                                            !window.confirm(
-                                              `Make ${u.name} the chapter president?${
-                                                deactivatePrevious
-                                                  ? " Previous president will be deactivated."
-                                                  : ""
-                                              }`,
-                                            )
-                                          ) {
-                                            return;
-                                          }
-                                          void assignPresident(u._id);
-                                        }}
-                                      >
-                                        Make president
-                                      </Button>
-                                    )}
+                                    <div className="inline-flex flex-wrap items-center justify-end gap-2">
+                                      {isCurrentPresident ? (
+                                        <span className="text-xs text-muted-foreground">Current president</span>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={presidentActionLoading}
+                                          onClick={() => {
+                                            if (
+                                              !window.confirm(
+                                                `Make ${u.name} the chapter president?${
+                                                  deactivatePrevious
+                                                    ? " Previous president will be deactivated."
+                                                    : ""
+                                                }`,
+                                              )
+                                            ) {
+                                              return;
+                                            }
+                                            void assignPresident(u._id);
+                                          }}
+                                        >
+                                          Make president
+                                        </Button>
+                                      )}
+                                      {!isCurrentPresident ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          disabled={deletingUserId === u._id}
+                                          onClick={() => void deleteTeamUser(u)}
+                                        >
+                                          {deletingUserId === u._id ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          )}
+                                          Delete
+                                        </Button>
+                                      ) : null}
+                                    </div>
                                   </TableCell>
                                 ) : null}
                               </TableRow>
@@ -1064,6 +1152,112 @@ function ChaptersPage() {
                   </div>
                 </TabsContent>
               </Tabs>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={memberDetailOpen} onOpenChange={setMemberDetailOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>{memberDetail?.user?.name || "Member details"}</SheetTitle>
+            <SheetDescription>
+              {memberDetail?.user?.chapter
+                ? `${memberDetail.user.chapter.name || ""}${
+                    memberDetail.user.chapter.city ? ` · ${memberDetail.user.chapter.city}` : ""
+                  }`
+                : "Profile and team donations"}
+            </SheetDescription>
+          </SheetHeader>
+          {memberDetailLoading ? (
+            <div className="flex items-center justify-center py-16 text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading member…
+            </div>
+          ) : memberDetail ? (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Total donated</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {fmtPKR(memberDetail.donationTotals.grandTotal)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Verified</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {fmtPKR(memberDetail.donationTotals.verified)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Pending</p>
+                  <p className="mt-1 text-lg font-semibold">
+                    {fmtPKR(memberDetail.donationTotals.pending)}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border p-4 space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="font-medium">{memberDetail.user.email || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Phone</p>
+                  <p className="font-medium">{memberDetail.user.phone || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Role</p>
+                  <p className="font-medium">
+                    {roleLabel(memberDetail.user.chapterRole || memberDetail.user.systemRole)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Cabinet</p>
+                  <p className="font-medium">{memberDetail.user.cabinetMember?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Director team</p>
+                  <p className="font-medium">{memberDetail.user.teamDirector?.name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last login</p>
+                  <p className="font-medium">{formatDateTime(memberDetail.user.lastLogin)}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border">
+                <div className="border-b border-border px-4 py-3">
+                  <h3 className="text-sm font-medium">
+                    Donations ({memberDetail.donationTotals.count})
+                  </h3>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Team</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {memberDetail.donations.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-muted-foreground">
+                          No team donations for this member.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      memberDetail.donations.map((d) => (
+                        <TableRow key={d._id}>
+                          <TableCell>{formatDate(d.createdAt)}</TableCell>
+                          <TableCell className="font-medium">{fmtPKR(d.amount)}</TableCell>
+                          <TableCell className="capitalize">{d.status}</TableCell>
+                          <TableCell>{d.teamDirector?.name || "Own collection"}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ) : null}
         </SheetContent>

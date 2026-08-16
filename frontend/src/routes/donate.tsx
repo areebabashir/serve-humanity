@@ -33,6 +33,7 @@ type PublicChapter = {
   city: string;
   imageUrl?: string;
   president: string;
+  members?: number;
   donationAccounts?: DonationAccount[];
 };
 
@@ -174,6 +175,9 @@ function DonatePage() {
                     ) : null}
                     <p className="mt-1 text-sm text-muted-foreground">
                       Led by <b className="text-foreground">{c.president}</b>
+                    </p>
+                    <p className="mt-2 text-xs font-semibold text-brand-blue">
+                      {Number(c.members) || 0} member{(Number(c.members) || 0) === 1 ? "" : "s"}
                     </p>
                     <div className="mt-auto pt-5">
                       <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-warm px-5 py-3 text-sm font-bold text-white shadow-warm transition group-hover:-translate-y-0.5">

@@ -29,6 +29,7 @@ export const SYSTEM_ROLES = [
 export const CHAPTER_ROLES = [
   "president",
   "vice_president",
+  "vice_president_male",
   "finance_head",
   "operations_head",
   "verification_head",
@@ -62,6 +63,17 @@ export function isFullAccessRole(role) {
   return FULL_ACCESS_ROLES.includes(role);
 }
 
+export const MEMBERSHIP_STATUSES = ["pending", "approved", "rejected"];
+
+/** Cabinet teams a public registrant can request to join */
+export const JOINABLE_CABINET_ROLES = [
+  "operations_head",
+  "verification_head",
+  "media_head",
+  "finance_head",
+  "documentation_head",
+];
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -90,6 +102,27 @@ const userSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    /**
+     * Public self-registration: pending until president / VPs / team cabinet head approve.
+     * Leadership-created accounts are approved by default.
+     */
+    membershipStatus: {
+      type: String,
+      enum: MEMBERSHIP_STATUSES,
+      default: "approved",
+      index: true,
+    },
+    /** Cabinet seat the registrant asked to join (e.g. documentation_head) */
+    requestedCabinetRole: {
+      type: String,
+      default: null,
+    },
+    membershipApprovedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    membershipApprovedAt: { type: Date, default: null },
     avatar: { type: String, default: "" },
     phone: { type: String, default: "" },
     isActive: { type: Boolean, default: true },

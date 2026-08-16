@@ -1,9 +1,14 @@
 import ChapterTeamDonation from "../models/ChapterTeamDonation.js";
 import Chapter from "../models/Chapter.js";
-import User from "../models/User.js";
+import User, { CEO_DASHBOARD_ROLES, isFullAccessRole } from "../models/User.js";
 import mongoose from "mongoose";
 import { uploadToCloudinary } from "../middleware/upload.js";
 import { isOwnCollectionRole, isTeamHeadRole, isCabinetRole, isTeamDirectorRole, isValidTeamLeadRole, TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
+import { sendEmail } from "../utils/email.js";
+
+function isCeoBoardDonor(user) {
+  return Boolean(user?.systemRole && CEO_DASHBOARD_ROLES.includes(user.systemRole));
+}
 
 const MONTH_NAMES = [
   "",
@@ -67,7 +72,12 @@ function canVerify(user) {
 }
 
 function canViewAll(user) {
-  return isPresident(user) || isFinanceDirector(user) || user?.chapterRole === "vice_president";
+  return (
+    isPresident(user) ||
+    isFinanceDirector(user) ||
+    user?.chapterRole === "vice_president" ||
+    user?.chapterRole === "vice_president_male"
+  );
 }
 
 function canViewDirectorTotals(user) {
@@ -245,6 +255,7 @@ export async function createChapterDonation(req, res, next) {
       chapter: cid,
       donor: req.user._id,
       teamDirector: teamDirectorId,
+      source: "chapter",
       amount,
       screenshotUrl,
       screenshotPublicId,
@@ -258,6 +269,204 @@ export async function createChapterDonation(req, res, next) {
       .populate("chapter", "name city");
 
     res.status(201).json({ success: true, data: populated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * BOG / CEO / Founder / CTO / COO: donate to a chapter by selecting it.
+ * Goes to that chapter's Finance Director for verify; then counts in chapter funds.
+ */
+export async function createBogDonation(req, res, next) {
+  try {
+    if (!isCeoBoardDonor(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only CEO / Board / BOG accounts can use this donation form.",
+      });
+    }
+
+    const chapterId = req.body.chapterId || req.body.chapter;
+    if (!chapterId || !mongoose.Types.ObjectId.isValid(chapterId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Select a valid chapter.",
+      });
+    }
+
+    const chapter = await Chapter.findById(chapterId).select("name city status donationAccounts");
+    if (!chapter || chapter.status === "inactive") {
+      return res.status(404).json({
+        success: false,
+        message: "Chapter not found or inactive.",
+      });
+    }
+
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid donation amount greater than 0.",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Upload a payment screenshot.",
+      });
+    }
+
+    const result = await uploadToCloudinary(req.file, "serve-humanity/bog-donations");
+    const screenshotUrl = result.secure_url;
+    const screenshotPublicId = result.public_id || "";
+
+    const doc = await ChapterTeamDonation.create({
+      chapter: chapter._id,
+      donor: req.user._id,
+      teamDirector: null,
+      source: "bog",
+      amount,
+      screenshotUrl,
+      screenshotPublicId,
+      note: req.body.note || "",
+      status: "pending",
+    });
+
+    // Notify chapter finance team (and president as backup).
+    const financeUsers = await User.find({
+      chapter: chapter._id,
+      isActive: { $ne: false },
+      $or: [
+        { chapterRole: "finance_head" },
+        { chapterRole: "president" },
+        { systemRole: "president" },
+      ],
+    })
+      .select("name email chapterRole")
+      .lean();
+
+    const donorName = req.user.name || "A board member";
+    const amtLabel = `PKR ${amount.toLocaleString()}`;
+    await Promise.all(
+      financeUsers
+        .filter((u) => u.email?.trim())
+        .map(async (u) => {
+          try {
+            await sendEmail({
+              to: u.email,
+              subject: `BOG donation pending — ${chapter.name}`,
+              text: `${donorName} submitted a ${amtLabel} donation for ${chapter.name} (${chapter.city || ""}). Please verify it in Chapter → Director donations.`,
+              html: `<p><strong>${donorName}</strong> submitted a <strong>${amtLabel}</strong> donation for <strong>${chapter.name}</strong>${chapter.city ? ` (${chapter.city})` : ""}.</p><p>Please open the chapter dashboard → <strong>Director donations</strong> to accept or reject this request.</p>`,
+            });
+          } catch {
+            /* non-blocking */
+          }
+        }),
+    );
+
+    const populated = await ChapterTeamDonation.findById(doc._id)
+      .populate("donor", "name email systemRole")
+      .populate("chapter", "name city");
+
+    res.status(201).json({
+      success: true,
+      message: "Donation submitted. The chapter finance team will verify it.",
+      data: populated,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * List BOG donations for the CEO dashboard.
+ * - mine=1 (default for personal totals): current user's donations, all-time
+ * - scope=all: every BOG donation (all CEO-dashboard roles can view)
+ */
+export async function listBogDonations(req, res, next) {
+  try {
+    if (!isCeoBoardDonor(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only CEO / Board / BOG accounts can view these donations.",
+      });
+    }
+
+    const scopeAll = req.query.scope === "all" || req.query.mine === "0";
+    const baseFilter = { source: "bog" };
+    if (!scopeAll) {
+      baseFilter.donor = req.user._id;
+    }
+    if (req.query.chapter) baseFilter.chapter = req.query.chapter;
+    if (req.query.status) baseFilter.status = req.query.status;
+
+    const period = resolvePeriod({ ...req.query, month: req.query.month || "all" });
+    const listFilter = applyPeriodFilter({ ...baseFilter }, period);
+
+    const [data, mineAgg, orgAgg] = await Promise.all([
+      ChapterTeamDonation.find(listFilter)
+        .populate("donor", "name email systemRole")
+        .populate("chapter", "name city")
+        .populate("verifiedBy", "name email")
+        .sort({ createdAt: -1 })
+        .lean(),
+      ChapterTeamDonation.aggregate([
+        { $match: { source: "bog", donor: req.user._id } },
+        {
+          $group: {
+            _id: "$status",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      ChapterTeamDonation.aggregate([
+        { $match: { source: "bog" } },
+        {
+          $group: {
+            _id: "$status",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const pick = (rows, status) => {
+      const hit = rows.find((r) => r._id === status);
+      return { total: hit?.total || 0, count: hit?.count || 0 };
+    };
+
+    const minePending = pick(mineAgg, "pending");
+    const mineVerified = pick(mineAgg, "verified");
+    const orgPending = pick(orgAgg, "pending");
+    const orgVerified = pick(orgAgg, "verified");
+
+    res.json({
+      success: true,
+      total: data.length,
+      ...sumByStatus(data),
+      period: periodMeta(period),
+      mine: {
+        pendingTotal: minePending.total,
+        pendingCount: minePending.count,
+        verifiedTotal: mineVerified.total,
+        verifiedCount: mineVerified.count,
+        lifetimeTotal: mineVerified.total,
+      },
+      org: {
+        pendingTotal: orgPending.total,
+        pendingCount: orgPending.count,
+        verifiedTotal: orgVerified.total,
+        verifiedCount: orgVerified.count,
+        lifetimeTotal: orgVerified.total,
+      },
+      canViewAll: true,
+      isFullAccess: isFullAccessRole(req.user.systemRole),
+      data,
+    });
   } catch (err) {
     next(err);
   }
@@ -308,7 +517,7 @@ export async function listChapterDonations(req, res, next) {
 
     const [data, byMonth] = await Promise.all([
       ChapterTeamDonation.find(listFilter)
-        .populate("donor", "name email chapterRole")
+        .populate("donor", "name email chapterRole systemRole")
         .populate("teamDirector", "name email chapterRole")
         .populate("verifiedBy", "name email")
         .sort({ createdAt: -1 })
@@ -434,9 +643,9 @@ export async function directorTeamTotals(req, res, next) {
       match.createdAt = { $gte: period.start, $lt: period.end };
     }
 
-    const [rows, byMonth, allMembers, unassignedMembers] = await Promise.all([
+    const [rows, byMonth, allMembers, unassignedMembers, bogRows] = await Promise.all([
       ChapterTeamDonation.aggregate([
-        { $match: match },
+        { $match: { ...match, source: { $ne: "bog" } } },
         {
           $group: {
             _id: { teamDirector: "$teamDirector", status: "$status" },
@@ -469,6 +678,16 @@ export async function directorTeamTotals(req, res, next) {
             .sort({ name: 1 })
             .lean()
         : [],
+      ChapterTeamDonation.aggregate([
+        { $match: { ...match, source: "bog" } },
+        {
+          $group: {
+            _id: "$status",
+            total: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const membersByDirector = new Map();
@@ -508,18 +727,28 @@ export async function directorTeamTotals(req, res, next) {
       (r) => r._id.teamDirector == null && r._id.status === "verified",
     );
 
-    const chapterPending = rows
-      .filter((r) => r._id.status === "pending")
-      .reduce((s, r) => s + r.total, 0);
-    const chapterVerified = rows
-      .filter((r) => r._id.status === "verified")
-      .reduce((s, r) => s + r.total, 0);
+    const bogPending = bogRows.find((r) => r._id === "pending");
+    const bogVerified = bogRows.find((r) => r._id === "verified");
+
+    const chapterPending =
+      rows.filter((r) => r._id.status === "pending").reduce((s, r) => s + r.total, 0) +
+      (bogPending?.total || 0);
+    const chapterVerified =
+      rows.filter((r) => r._id.status === "verified").reduce((s, r) => s + r.total, 0) +
+      (bogVerified?.total || 0);
 
     res.json({
       success: true,
       scope: isCabinetView ? "cabinet" : "chapter",
       period: periodMeta(period),
       byMonth,
+      bog: {
+        pendingTotal: bogPending?.total || 0,
+        verifiedTotal: bogVerified?.total || 0,
+        pendingCount: bogPending?.count || 0,
+        verifiedCount: bogVerified?.count || 0,
+        grandTotal: (bogPending?.total || 0) + (bogVerified?.total || 0),
+      },
       chapterPendingTotal: chapterPending,
       chapterVerifiedTotal: chapterVerified,
       chapterGrandTotal: chapterPending + chapterVerified,

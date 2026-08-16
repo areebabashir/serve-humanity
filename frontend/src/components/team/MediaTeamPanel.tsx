@@ -38,8 +38,8 @@ function exportMediaExcel(rows: MediaRecord[]) {
   ];
   downloadStyledAoaExcel(
     data,
-    "Media Cases",
-    `Team-Media-Cases-${new Date().toISOString().slice(0, 10)}.xlsx`,
+    "Ref File",
+    `Media-Ref-File-${new Date().toISOString().slice(0, 10)}.xlsx`,
   );
 }
 
@@ -92,13 +92,13 @@ export function MediaTeamPanel({ canWrite = true }: { canWrite?: boolean }) {
           method: "PATCH",
           body: JSON.stringify(form),
         });
-        toast.success("Media case record updated");
+        toast.success("Ref file row updated");
       } else {
         await api("/team-records", {
           method: "POST",
           body: JSON.stringify({ kind: "media", ...form }),
         });
-        toast.success("Media case record added");
+        toast.success("Ref file row added");
       }
       resetForm();
       await load();
@@ -110,7 +110,7 @@ export function MediaTeamPanel({ canWrite = true }: { canWrite?: boolean }) {
   }
 
   async function onDelete(id: string) {
-    if (!confirm("Delete this media case record?")) return;
+    if (!confirm("Delete this ref file row?")) return;
     try {
       await api(`/team-records/${id}`, { method: "DELETE" });
       toast.success("Deleted");
@@ -127,7 +127,7 @@ export function MediaTeamPanel({ canWrite = true }: { canWrite?: boolean }) {
         <div className="rounded-2xl border border-border bg-card p-4 shadow-soft md:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">
-              {editingId ? "Edit media case row" : "Add media case row"}
+              {editingId ? "Edit ref file row" : "Add ref file row"}
             </h3>
             {editingId ? (
               <Button type="button" variant="ghost" size="sm" onClick={resetForm}>
@@ -210,7 +210,7 @@ export function MediaTeamPanel({ canWrite = true }: { canWrite?: boolean }) {
             ) : rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={canWrite ? 5 : 4} className="text-muted-foreground">
-                  No media case rows yet.
+                  No ref file rows yet.
                 </TableCell>
               </TableRow>
             ) : (

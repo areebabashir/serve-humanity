@@ -9,16 +9,23 @@ import {
 } from "react";
 import { api, setToken, type AuthUser } from "./api";
 
+export type RegisterInput = {
+  name: string;
+  email: string;
+  password: string;
+  chapter: string;
+  team: string;
+};
+
+export type RegisterResult =
+  | { pendingApproval: true; message: string }
+  | { pendingApproval?: false; user: AuthUser };
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
-  register: (input: {
-    name: string;
-    email: string;
-    password: string;
-    chapter: string;
-  }) => Promise<AuthUser>;
+  register: (input: RegisterInput) => Promise<RegisterResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -61,23 +68,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.user;
   }, []);
 
-  const register = useCallback(
-    async (input: {
-      name: string;
-      email: string;
-      password: string;
-      chapter: string;
-    }) => {
-      const data = await api<{ success: true; token: string; user: AuthUser }>("/auth/register", {
-        method: "POST",
-        body: JSON.stringify(input),
-      });
-      setToken(data.token);
-      setUser(data.user);
-      return data.user;
-    },
-    [],
-  );
+  const register = useCallback(async (input: RegisterInput) => {
+    const data = await api<{
+      success: true;
+      pendingApproval?: boolean;
+      message?: string;
+      token?: string;
+      user?: AuthUser;
+    }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({
+        name: input.name,
+        email: input.email,
+        password: input.password,
+        chapter: input.chapter,
+        team: input.team,
+        requestedCabinetRole: input.team,
+      }),
+    });
+
+    if (data.pendingApproval || !data.token || !data.user) {
+      return {
+        pendingApproval: true as const,
+        message:
+          data.message ||
+          "Registration submitted. Wait for chapter leadership to approve before you can log in.",
+      };
+    }
+
+    setToken(data.token);
+    setUser(data.user);
+    return { user: data.user };
+  }, []);
 
   const logout = useCallback(async () => {
     try {

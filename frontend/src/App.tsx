@@ -21,6 +21,7 @@ import ChapterVerificationPage from "./routes/chapter/verification";
 import ChapterOperationsPage from "./routes/chapter/operations";
 import ChapterFinancePage from "./routes/chapter/finance";
 import ChapterDocumentationPage from "./routes/chapter/documentation";
+import ChapterCaseRegistrationsPage from "./routes/chapter/case-registrations";
 import ChapterMediaPage from "./routes/chapter/media";
 import ChapterMediaCasesPage from "./routes/chapter/media-cases";
 import ChapterTeamPage from "./routes/chapter/team";
@@ -147,6 +148,14 @@ export default function App() {
           element={
             <ChapterModule module="documentation">
               <ChapterDocumentationPage />
+            </ChapterModule>
+          }
+        />
+        <Route
+          path="case-registrations"
+          element={
+            <ChapterModule module="case-registrations">
+              <ChapterCaseRegistrationsPage />
             </ChapterModule>
           }
         />

@@ -166,9 +166,9 @@ export default function Page() {
                 </Link>
               </p>
               <p>
-                Want to volunteer?{" "}
+                Need support?{" "}
                 <Link to="/volunteer" className="font-semibold text-brand-blue hover:underline">
-                  Apply here
+                  Request help
                 </Link>
               </p>
             </div>

@@ -85,7 +85,7 @@ type OverviewData = {
     unreadNotifications: number;
     expensesAwaitingCeo: number;
   };
-  trend: { month: string; donations: number; expenses: number }[];
+  trend: { month: string; donations: number; membersJoined: number }[];
   momPct: number;
   chapters: { id: string; name: string; city: string }[];
   alerts: {
@@ -110,7 +110,7 @@ type OverviewData = {
   activity: { id: string; type: string; text: string; meta: string }[];
 };
 
-type TrendPoint = { month: string; label?: string; donations: number; expenses: number };
+type TrendPoint = { month: string; label?: string; donations: number; membersJoined: number };
 
 type TrendData = {
   mode: "monthly" | "daily";
@@ -118,7 +118,7 @@ type TrendData = {
   chapter: string;
   points: TrendPoint[];
   momPct?: number;
-  totals: { donations: number; expenses: number };
+  totals: { donations: number; membersJoined: number };
 };
 
 const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -429,14 +429,14 @@ function OverviewPage() {
             <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-[var(--shadow-card)] lg:col-span-2">
               <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-base font-semibold tracking-tight">Donations vs Expenses</h2>
+                  <h2 className="text-base font-semibold tracking-tight">Donations vs Members joined</h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">{chartSubtitle}</p>
                   <div className="mt-3 flex flex-wrap gap-3 text-xs">
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                       <span className="h-2 w-2 rounded-full bg-[var(--brand-blue)]" /> Donations
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                      <span className="h-2 w-2 rounded-full bg-[var(--brand-orange)]" /> Expenses
+                      <span className="h-2 w-2 rounded-full bg-[var(--brand-orange)]" /> Members joined
                     </span>
                   </div>
                 </div>
@@ -490,9 +490,9 @@ function OverviewPage() {
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : null}
-                {trend.every((t) => t.donations === 0 && t.expenses === 0) ? (
+                {trend.every((t) => t.donations === 0 && (t.membersJoined || 0) === 0) ? (
                   <div className="grid h-full place-items-center text-sm text-muted-foreground">
-                    No donation or expense data for this filter.
+                    No donation or member join data for this filter.
                   </div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
@@ -502,7 +502,7 @@ function OverviewPage() {
                           <stop offset="0%" stopColor="var(--brand-blue)" stopOpacity={0.4} />
                           <stop offset="100%" stopColor="var(--brand-blue)" stopOpacity={0} />
                         </linearGradient>
-                        <linearGradient id="gExp" x1="0" x2="0" y1="0" y2="1">
+                        <linearGradient id="gMembers" x1="0" x2="0" y1="0" y2="1">
                           <stop offset="0%" stopColor="var(--brand-orange)" stopOpacity={0.35} />
                           <stop offset="100%" stopColor="var(--brand-orange)" stopOpacity={0} />
                         </linearGradient>
@@ -517,6 +517,7 @@ function OverviewPage() {
                         interval={trendMode === "daily" ? 4 : 0}
                       />
                       <YAxis
+                        yAxisId="donations"
                         stroke="var(--muted-foreground)"
                         fontSize={12}
                         tickLine={false}
@@ -526,6 +527,15 @@ function OverviewPage() {
                             ? `${(v / 1_000_000).toFixed(1)}M`
                             : `${Math.round(v / 1000)}K`
                         }
+                      />
+                      <YAxis
+                        yAxisId="members"
+                        orientation="right"
+                        stroke="var(--muted-foreground)"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={false}
+                        allowDecimals={false}
                       />
                       <Tooltip
                         contentStyle={{
@@ -538,21 +548,29 @@ function OverviewPage() {
                         labelFormatter={(_, payload) =>
                           (payload?.[0]?.payload as TrendPoint | undefined)?.label || ""
                         }
-                        formatter={(v: number) => fmtPKR(v)}
+                        formatter={(v: number, name: string) =>
+                          name === "membersJoined" || name === "Members joined"
+                            ? [v, "Members joined"]
+                            : [fmtPKR(v), "Donations"]
+                        }
                       />
                       <Area
+                        yAxisId="donations"
                         type="monotone"
                         dataKey="donations"
+                        name="Donations"
                         stroke="var(--brand-blue)"
                         strokeWidth={2.5}
                         fill="url(#gDon)"
                       />
                       <Area
+                        yAxisId="members"
                         type="monotone"
-                        dataKey="expenses"
+                        dataKey="membersJoined"
+                        name="Members joined"
                         stroke="var(--brand-orange)"
                         strokeWidth={2.5}
-                        fill="url(#gExp)"
+                        fill="url(#gMembers)"
                       />
                     </AreaChart>
                   </ResponsiveContainer>

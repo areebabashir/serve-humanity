@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Loader2, UserPlus } from "lucide-react";
+import { Check, Loader2, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { ChapterCard, ChapterPageHeader } from "@/components/chapter/ChapterPage";
 import {
@@ -7,8 +7,10 @@ import {
   CHAPTER_ROLE_LABEL,
   canAssignChapterRoles,
   canManageCabinetTeam,
+  canReviewJoinRequests,
   idOfRef,
   isCabinetRole,
+  isChapterPresident,
   isOwnCollectionRole,
   isTeamDirectorRole,
   type ChapterRole,
@@ -18,6 +20,7 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -48,9 +51,62 @@ function roleLabel(role: string | undefined): string {
   return CHAPTER_ROLE_LABEL[role as ChapterRole] || role;
 }
 
+/** Short team name from a cabinet seat role */
+const TEAM_NAME: Record<string, string> = {
+  operations_head: "Operations",
+  verification_head: "Verification",
+  media_head: "Media",
+  finance_head: "Finance",
+  documentation_head: "Documentation",
+};
+
+function teamNameFromCabinetRole(role?: string | null): string {
+  if (!role) return "Team";
+  return TEAM_NAME[role] || roleLabel(role).replace(/^Cabinet — /, "");
+}
+
+function cabinetRoleOf(user: AuthUser | null | undefined): string | null {
+  if (!user) return null;
+  if (isCabinetRole(user.chapterRole)) return user.chapterRole || null;
+  const cm = user.cabinetMember;
+  if (cm && typeof cm === "object" && cm.chapterRole) return cm.chapterRole;
+  return null;
+}
+
+/** e.g. "Sara · Documentation Director" */
+function directorDisplayName(
+  director: { name?: string; cabinetMember?: AuthUser["cabinetMember"] } | null | undefined,
+  fallbackCabinetRole?: string | null,
+): string {
+  if (!director?.name) return "—";
+  const cm = director.cabinetMember;
+  const role =
+    (cm && typeof cm === "object" ? cm.chapterRole : null) || fallbackCabinetRole || null;
+  const team = teamNameFromCabinetRole(role);
+  return `${director.name} · ${team} Director`;
+}
+
+function memberRoleDisplay(u: AuthUser): string {
+  if (isTeamDirectorRole(u.chapterRole)) {
+    const team = teamNameFromCabinetRole(cabinetRoleOf(u));
+    return `${team} Director`;
+  }
+  return roleLabel(u.chapterRole);
+}
+
 function refId(u: AuthUser, key: "cabinetMember" | "teamDirector"): string {
   return idOfRef(u[key]) || "none";
 }
+
+type JoinRequest = {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  requestedCabinetRole?: string;
+  teamLabel?: string;
+  createdAt?: string;
+};
 
 const emptyForm = {
   name: "",
@@ -65,16 +121,16 @@ export default function ChapterTeamPage() {
   const { user: me, refresh } = useAuth();
   const canAssign = canAssignChapterRoles(me);
   const isCabinet = canManageCabinetTeam(me);
+  const canDeleteAccounts = isChapterPresident(me);
+  const canReviewJoins = canReviewJoinRequests(me);
   const [rows, setRows] = useState<AuthUser[]>([]);
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [joinBusyId, setJoinBusyId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
-
-  const cabinetMembers = useMemo(
-    () => rows.filter((u) => isCabinetRole(u.chapterRole) && u.isActive !== false),
-    [rows],
-  );
 
   const myDirectors = useMemo(
     () =>
@@ -109,18 +165,44 @@ export default function ChapterTeamPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api<{ success: true; data: AuthUser[] }>("/users?limit=200");
-      setRows(res.data || []);
+      const tasks: Promise<unknown>[] = [
+        api<{ success: true; data: AuthUser[] }>("/users?limit=200").then((res) => {
+          setRows(res.data || []);
+        }),
+      ];
+      if (canReviewJoins) {
+        tasks.push(
+          api<{ success: true; data: JoinRequest[] }>("/users/join-requests")
+            .then((res) => setJoinRequests(res.data || []))
+            .catch(() => setJoinRequests([])),
+        );
+      } else {
+        setJoinRequests([]);
+      }
+      await Promise.all(tasks);
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : "Failed to load team");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canReviewJoins]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function reviewJoin(id: string, action: "approve" | "reject") {
+    setJoinBusyId(id);
+    try {
+      await api(`/users/${id}/join-${action}`, { method: "PATCH" });
+      toast.success(action === "approve" ? "Member approved — they can log in now" : "Join request rejected");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Update failed");
+    } finally {
+      setJoinBusyId(null);
+    }
+  }
 
   async function changeRole(userId: string, chapterRole: string) {
     if (userId === me?._id) {
@@ -139,22 +221,6 @@ export default function ChapterTeamPage() {
     }
   }
 
-  async function changeCabinet(userId: string, cabinetMember: string) {
-    try {
-      await api(`/users/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          cabinetMember: cabinetMember === "none" ? null : cabinetMember,
-        }),
-      });
-      toast.success("Cabinet assignment updated");
-      await load();
-      if (userId === me?._id) await refresh();
-    } catch (err) {
-      toast.error(err instanceof ApiRequestError ? err.message : "Update failed");
-    }
-  }
-
   async function changeDirector(userId: string, teamDirector: string) {
     try {
       await api(`/users/${userId}`, {
@@ -168,6 +234,26 @@ export default function ChapterTeamPage() {
       if (userId === me?._id) await refresh();
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : "Update failed");
+    }
+  }
+
+  async function deleteAccount(u: AuthUser) {
+    if (
+      !window.confirm(
+        `Delete account for ${u.name} (${u.email})? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(u._id);
+    try {
+      await api(`/users/${u._id}`, { method: "DELETE" });
+      toast.success("Account deleted");
+      await load();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Failed to delete account");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -230,9 +316,9 @@ export default function ChapterTeamPage() {
         title="Team & Roles"
         description={
           canAssign
-            ? "Create Vice President and cabinet members. Assign registered members to a cabinet. Cabinet members then add directors and place members on those teams."
+            ? "Approve join requests and create Vice Presidents / cabinet seats. Members are verified into a team on join — cabinet heads assign them to directors."
             : isCabinet
-              ? "Add directors for your cabinet team, then assign your members to a director."
+              ? "Approve join requests for your team, add directors, then assign your members to a director (shown as Documentation Director, etc.)."
               : "Chapter login accounts and their roles."
         }
         actions={
@@ -354,6 +440,81 @@ export default function ChapterTeamPage() {
           ) : null
         }
       />
+
+      {canReviewJoins ? (
+        <ChapterCard className="mb-5 overflow-x-auto p-0 md:p-0">
+          <div className="border-b border-border px-4 py-3">
+            <h3 className="text-sm font-semibold">Pending join requests</h3>
+            <p className="text-xs text-muted-foreground">
+              Approve so the member can log in. Notified: president, both VPs, and the selected
+              team&apos;s cabinet head.
+            </p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Team</TableHead>
+                <TableHead>Requested</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-muted-foreground">
+                    <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
+                  </TableCell>
+                </TableRow>
+              ) : joinRequests.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-muted-foreground">
+                    No pending join requests.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                joinRequests.map((r) => (
+                  <TableRow key={r._id}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell>{r.email}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{r.teamLabel || r.requestedCabinetRole || "—"}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleString() : "—"}
+                    </TableCell>
+                    <TableCell className="space-x-1 text-right">
+                      <Button
+                        size="sm"
+                        disabled={joinBusyId === r._id}
+                        onClick={() => void reviewJoin(r._id, "approve")}
+                      >
+                        {joinBusyId === r._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5" />
+                        )}
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive"
+                        disabled={joinBusyId === r._id}
+                        onClick={() => void reviewJoin(r._id, "reject")}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </ChapterCard>
+      ) : null}
+
       <ChapterCard className="overflow-x-auto p-0 md:p-0">
         <Table>
           <TableHeader>
@@ -363,18 +524,19 @@ export default function ChapterTeamPage() {
               <TableHead>Role</TableHead>
               <TableHead>Cabinet</TableHead>
               <TableHead>Director</TableHead>
+              {canDeleteAccounts ? <TableHead className="text-right">Actions</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={canDeleteAccounts ? 6 : 5} className="text-muted-foreground">
                   <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-muted-foreground">
+                <TableCell colSpan={canDeleteAccounts ? 6 : 5} className="text-muted-foreground">
                   No users found for this chapter.
                 </TableCell>
               </TableRow>
@@ -388,13 +550,14 @@ export default function ChapterTeamPage() {
                 const canEditRole = canAssign && !isSelf && !isTargetPresident;
                 const isMember =
                   u.chapterRole === "member" || u.chapterRole === "assistant_director";
-                const canEditCabinet = canAssign && isMember;
+                // President / VPs do not assign members — cabinet verifies join, then assigns directors
                 const inMyCabinet = idOfRef(u.cabinetMember) === me?._id;
                 const canEditDirector = isCabinet && !canAssign && isMember && inMyCabinet;
                 const current = (u.chapterRole as ChapterRole) || "member";
                 const selectValue = CABINET_ASSIGNABLE_ROLES.includes(current)
                   ? current
                   : undefined;
+                const showDelete = canDeleteAccounts && !isSelf && !isTargetPresident;
 
                 return (
                   <TableRow key={u._id}>
@@ -427,7 +590,7 @@ export default function ChapterTeamPage() {
                         </Select>
                       ) : (
                         <span className="text-sm">
-                          {roleLabel(u.chapterRole)}
+                          {memberRoleDisplay(u)}
                           {isSelf && canAssign ? (
                             <span className="ml-2 text-xs text-muted-foreground">— locked</span>
                           ) : null}
@@ -440,30 +603,13 @@ export default function ChapterTeamPage() {
                       ) : isTeamDirectorRole(u.chapterRole) ? (
                         <span className="text-xs text-muted-foreground">
                           {typeof u.cabinetMember === "object" && u.cabinetMember?.name
-                            ? u.cabinetMember.name
+                            ? `${u.cabinetMember.name} · ${roleLabel(u.cabinetMember.chapterRole)}`
                             : "Your cabinet"}
                         </span>
-                      ) : canEditCabinet ? (
-                        <Select
-                          value={refId(u, "cabinetMember")}
-                          onValueChange={(v) => void changeCabinet(u._id, v)}
-                        >
-                          <SelectTrigger className="w-[220px]">
-                            <SelectValue placeholder="Assign cabinet" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Unassigned</SelectItem>
-                            {cabinetMembers.map((c) => (
-                              <SelectItem key={c._id} value={c._id}>
-                                {c.name} · {roleLabel(c.chapterRole)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
                       ) : (
                         <span className="text-xs text-muted-foreground">
                           {typeof u.cabinetMember === "object" && u.cabinetMember?.name
-                            ? u.cabinetMember.name
+                            ? `${u.cabinetMember.name} · ${teamNameFromCabinetRole(u.cabinetMember.chapterRole)}`
                             : "Unassigned"}
                         </span>
                       )}
@@ -472,20 +618,22 @@ export default function ChapterTeamPage() {
                       {ownCollectionOnly || isCabinetRole(u.chapterRole) ? (
                         <span className="text-xs text-muted-foreground">Own collection</span>
                       ) : isTeamDirectorRole(u.chapterRole) ? (
-                        <span className="text-xs text-muted-foreground">Leads this team</span>
+                        <span className="text-xs font-medium text-foreground">
+                          {memberRoleDisplay(u)}
+                        </span>
                       ) : canEditDirector ? (
                         <Select
                           value={refId(u, "teamDirector")}
                           onValueChange={(v) => void changeDirector(u._id, v)}
                         >
-                          <SelectTrigger className="w-[220px]">
+                          <SelectTrigger className="w-[260px]">
                             <SelectValue placeholder="Assign director" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">Unassigned</SelectItem>
                             {myDirectors.map((d) => (
                               <SelectItem key={d._id} value={d._id}>
-                                {d.name}
+                                {directorDisplayName(d, me?.chapterRole)}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -493,11 +641,41 @@ export default function ChapterTeamPage() {
                       ) : (
                         <span className="text-xs text-muted-foreground">
                           {typeof u.teamDirector === "object" && u.teamDirector?.name
-                            ? u.teamDirector.name
+                            ? directorDisplayName(
+                                {
+                                  name: u.teamDirector.name,
+                                  cabinetMember: u.cabinetMember,
+                                },
+                                cabinetRoleOf(u),
+                              )
                             : "Unassigned"}
                         </span>
                       )}
                     </TableCell>
+                    {canDeleteAccounts ? (
+                      <TableCell className="text-right">
+                        {showDelete ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            disabled={deletingId === u._id}
+                            onClick={() => void deleteAccount(u)}
+                          >
+                            {deletingId === u._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            Delete
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {isSelf ? "You" : isTargetPresident ? "President" : "—"}
+                          </span>
+                        )}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 );
               })

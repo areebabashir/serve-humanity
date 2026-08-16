@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState, type FormEvent, type SVGProps } from "react";
-import { Facebook, Instagram, Twitter, Youtube, Mail, ArrowUpRight, Heart, Loader2 } from "lucide-react";
+import { Facebook, Instagram, Twitter, Mail, ArrowUpRight, Heart, Loader2 } from "lucide-react";
 import { Logo } from "./Logo";
 import { useWebsitePage } from "@/lib/websiteContent";
 import { api, ApiRequestError } from "@/lib/api";
@@ -19,7 +19,7 @@ const cols = [
     title: "Get Involved",
     links: [
       { label: "Donate", to: "/donate" },
-      { label: "Volunteer", to: "/volunteer" },
+      { label: "Need Support", to: "/volunteer" },
       { label: "Events", to: "/events" },
       { label: "Gallery", to: "/gallery" },
     ],
@@ -53,7 +53,6 @@ const SOCIAL: {
   { Icon: Facebook, key: "facebook", label: "Facebook" },
   { Icon: Instagram, key: "instagram", label: "Instagram" },
   { Icon: Twitter, key: "twitter", label: "Twitter" },
-  { Icon: Youtube, key: "youtube", label: "YouTube" },
   { Icon: WhatsAppIcon, key: "whatsapp", label: "WhatsApp" },
 ];
 

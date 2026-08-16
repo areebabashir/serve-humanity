@@ -41,7 +41,8 @@ type DonationRow = {
   screenshotUrl?: string;
   status: string;
   createdAt?: string;
-  donor?: { name?: string };
+  source?: string;
+  donor?: { name?: string; systemRole?: string };
   teamDirector?: { _id?: string; name?: string } | null;
 };
 
@@ -67,6 +68,7 @@ export default function DirectorDonationsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [canVerify, setCanVerify] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [bogTotals, setBogTotals] = useState({ pendingTotal: 0, verifiedTotal: 0, grandTotal: 0 });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -84,6 +86,7 @@ export default function DirectorDonationsPage() {
           canVerify?: boolean;
           period?: { label?: string; year?: number; month?: number };
           byMonth?: MonthCollectionRow[];
+          bog?: { pendingTotal: number; verifiedTotal: number; grandTotal: number };
         }>("/chapter-donations/director-totals"),
         api<{ success: true; data: DonationRow[] }>("/chapter-donations"),
       ]);
@@ -96,6 +99,7 @@ export default function DirectorDonationsPage() {
       setPeriodLabel(totals.period?.label || "This month");
       setByMonth(totals.byMonth || []);
       setCanVerify(Boolean(totals.canVerify));
+      setBogTotals(totals.bog || { pendingTotal: 0, verifiedTotal: 0, grandTotal: 0 });
       setRows(list.data || []);
       if ((totals.directors || []).length > 0) {
         setExpanded((prev) => {
@@ -169,6 +173,16 @@ export default function DirectorDonationsPage() {
           <p className="mt-1 text-[11px] text-muted-foreground">{periodLabel}</p>
         </ChapterCard>
       </div>
+
+      {bogTotals.grandTotal > 0 || bogTotals.pendingTotal > 0 ? (
+        <ChapterCard className="mb-5 border-sky-200 bg-sky-50/40">
+          <p className="text-sm font-semibold text-sky-900">BOG / Board donations this month</p>
+          <p className="mt-1 text-xs text-sky-800">
+            Pending {fmt(bogTotals.pendingTotal)} · Verified {fmt(bogTotals.verifiedTotal)}. Verify them in
+            “This month&apos;s donations” (labeled BOG / Board).
+          </p>
+        </ChapterCard>
+      ) : null}
 
       {isCabinet && unassignedMembers.length > 0 ? (
         <ChapterCard className="mb-5 border-amber-200 bg-amber-50/50">
@@ -406,7 +420,11 @@ export default function DirectorDonationsPage() {
                   rows.map((r) => (
                     <TableRow key={r._id}>
                       <TableCell className="font-medium">{r.donor?.name || "—"}</TableCell>
-                      <TableCell>{r.teamDirector?.name || "Own collection"}</TableCell>
+                      <TableCell>
+                        {r.source === "bog"
+                          ? "BOG / Board"
+                          : r.teamDirector?.name || "Own collection"}
+                      </TableCell>
                       <TableCell>{fmt(r.amount)}</TableCell>
                       <TableCell>
                         <Badge variant="secondary">{r.status}</Badge>

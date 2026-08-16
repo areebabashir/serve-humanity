@@ -1,14 +1,25 @@
 import User, { CEO_DASHBOARD_ROLES, FULL_ACCESS_ROLES, isFullAccessRole } from "../models/User.js";
+import Chapter from "../models/Chapter.js";
+import ChapterTeamDonation from "../models/ChapterTeamDonation.js";
 import {
   isOwnCollectionRole,
   isCabinetRole,
   isTeamDirectorRole,
   isValidTeamLeadRole,
+  isVicePresidentRole,
   CABINET_ROLES,
   CABINET_ASSIGNABLE_ROLES,
 } from "../lib/teamHeads.js";
 
 const USER_LEADERSHIP = new Set(FULL_ACCESS_ROLES);
+
+const TEAM_LABEL = {
+  operations_head: "Operations",
+  verification_head: "Verification",
+  media_head: "Media & Graphics",
+  finance_head: "Finance",
+  documentation_head: "Documentation",
+};
 
 /** Roles leadership can create from Board page (one active seat each) */
 const BOARD_CREATABLE_ROLES = [
@@ -37,11 +48,22 @@ function isChapterPresident(user) {
 }
 
 function canAssignRoles(user) {
-  return isChapterPresident(user) || user?.chapterRole === "vice_president";
+  return isChapterPresident(user) || isVicePresidentRole(user?.chapterRole);
 }
 
 function isCabinetUser(user) {
   return isCabinetRole(user?.chapterRole);
+}
+
+function canReviewJoinRequest(reviewer, applicant) {
+  if (!reviewer || !applicant) return false;
+  const cid = chapterIdOf(reviewer);
+  if (!cid || String(applicant.chapter) !== String(cid)) return false;
+  if (isChapterPresident(reviewer) || isVicePresidentRole(reviewer.chapterRole)) return true;
+  return (
+    isCabinetRole(reviewer.chapterRole) &&
+    reviewer.chapterRole === applicant.requestedCabinetRole
+  );
 }
 
 function refId(ref) {
@@ -137,7 +159,10 @@ export async function createChapterDirector(req, res, next) {
       cabinetMember: null,
       teamDirector: null,
       isActive: true,
+      membershipStatus: "approved",
     });
+
+    await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
 
     const safe = await User.findById(user._id)
       .select("-password")
@@ -199,7 +224,10 @@ export async function createTeamDirector(req, res, next) {
       cabinetMember: req.user._id,
       teamDirector: null,
       isActive: true,
+      membershipStatus: "approved",
     });
+
+    await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
 
     const safe = await User.findById(user._id)
       .select("-password")
@@ -287,6 +315,9 @@ export async function getAllUsers(req, res, next) {
       }
     }
 
+    // Pending join requests are managed separately
+    filter.membershipStatus = { $ne: "pending" };
+
     const skip = (Number(page) - 1) * Number(limit);
     const [users, total] = await Promise.all([
       User.find(filter)
@@ -304,11 +335,278 @@ export async function getAllUsers(req, res, next) {
   }
 }
 
+/**
+ * GET /users/join-requests
+ * President, both VPs, and the matching cabinet head see pending join requests.
+ */
+export async function listJoinRequests(req, res, next) {
+  try {
+    const chapterId = chapterIdOf(req.user);
+    if (!chapterId) {
+      return res.status(400).json({
+        success: false,
+        message: "Your account is not linked to a chapter.",
+      });
+    }
+
+    const isLeader = isChapterPresident(req.user) || isVicePresidentRole(req.user.chapterRole);
+    const isCabinetHead = isCabinetRole(req.user.chapterRole);
+    if (!isLeader && !isCabinetHead) {
+      return res.status(403).json({ success: false, message: "Access denied." });
+    }
+
+    const filter = {
+      chapter: chapterId,
+      membershipStatus: "pending",
+      systemRole: "member",
+      chapterRole: "member",
+    };
+    if (!isLeader && isCabinetHead) {
+      filter.requestedCabinetRole = req.user.chapterRole;
+    }
+
+    const data = await User.find(filter)
+      .select("-password")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      total: data.length,
+      data: data.map((u) => ({
+        ...u,
+        teamLabel: TEAM_LABEL[u.requestedCabinetRole] || u.requestedCabinetRole || "—",
+      })),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /users/:id/join-approve
+ * Any one of president / VPs / that team's cabinet head can approve.
+ */
+export async function approveJoinRequest(req, res, next) {
+  try {
+    const applicant = await User.findById(req.params.id);
+    if (!applicant || applicant.membershipStatus !== "pending") {
+      return res.status(404).json({ success: false, message: "Pending join request not found." });
+    }
+    if (!canReviewJoinRequest(req.user, applicant)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the president, vice presidents, or that team's cabinet head can approve.",
+      });
+    }
+
+    const chapterId = chapterIdOf(applicant);
+    let cabinetHead = null;
+    if (applicant.requestedCabinetRole) {
+      cabinetHead = await User.findOne({
+        chapter: chapterId,
+        chapterRole: applicant.requestedCabinetRole,
+        isActive: { $ne: false },
+        membershipStatus: { $ne: "pending" },
+      }).select("_id");
+    }
+
+    applicant.membershipStatus = "approved";
+    applicant.membershipApprovedBy = req.user._id;
+    applicant.membershipApprovedAt = new Date();
+    applicant.cabinetMember = cabinetHead?._id || null;
+    applicant.teamDirector = null;
+    await applicant.save();
+
+    await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
+
+    const safe = await User.findById(applicant._id)
+      .select("-password")
+      .populate("cabinetMember", "name email chapterRole")
+      .populate("chapter", "name city");
+
+    res.json({
+      success: true,
+      message: "Member approved. They can now log in.",
+      data: safe,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /users/:id/join-reject
+ */
+export async function rejectJoinRequest(req, res, next) {
+  try {
+    const applicant = await User.findById(req.params.id);
+    if (!applicant || applicant.membershipStatus !== "pending") {
+      return res.status(404).json({ success: false, message: "Pending join request not found." });
+    }
+    if (!canReviewJoinRequest(req.user, applicant)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only the president, vice presidents, or that team's cabinet head can reject.",
+      });
+    }
+
+    applicant.membershipStatus = "rejected";
+    applicant.membershipApprovedBy = req.user._id;
+    applicant.membershipApprovedAt = new Date();
+    await applicant.save();
+
+    res.json({
+      success: true,
+      message: "Join request rejected.",
+      data: {
+        _id: applicant._id,
+        email: applicant.email,
+        membershipStatus: applicant.membershipStatus,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getUser(req, res, next) {
   try {
     const user = await User.findById(req.params.id).populate("chapter", "name city");
     if (!user) return res.status(404).json({ success: false, message: "User not found." });
     res.json({ success: true, data: user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * CEO dashboard: all chapter login accounts, optional chapter + search filter,
+ * with per-member team-donation totals.
+ * GET /users/chapter-members?chapter=&q=
+ */
+export async function listChapterMembersForCeo(req, res, next) {
+  try {
+    const { chapter, q } = req.query;
+    const filter = {
+      chapter: { $ne: null },
+      systemRole: { $nin: CEO_DASHBOARD_ROLES },
+    };
+
+    if (chapter && String(chapter) !== "all") {
+      filter.chapter = chapter;
+    }
+
+    if (q?.trim()) {
+      const needle = String(q).trim();
+      const rx = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: rx }, { email: rx }, { phone: rx }];
+    }
+
+    const users = await User.find(filter)
+      .select("-password")
+      .populate("chapter", "name city")
+      .populate("teamDirector", "name email chapterRole")
+      .populate("cabinetMember", "name email chapterRole")
+      .sort({ name: 1 })
+      .lean();
+
+    const donorIds = users.map((u) => u._id);
+    const totals =
+      donorIds.length === 0
+        ? []
+        : await ChapterTeamDonation.aggregate([
+            { $match: { donor: { $in: donorIds } } },
+            {
+              $group: {
+                _id: "$donor",
+                total: { $sum: "$amount" },
+                verified: {
+                  $sum: { $cond: [{ $eq: ["$status", "verified"] }, "$amount", 0] },
+                },
+                pending: {
+                  $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] },
+                },
+                count: { $sum: 1 },
+              },
+            },
+          ]);
+
+    const byDonor = Object.fromEntries(totals.map((t) => [String(t._id), t]));
+
+    const data = users.map((u) => {
+      const t = byDonor[String(u._id)];
+      return {
+        ...u,
+        donationTotals: {
+          total: t?.total || 0,
+          verified: t?.verified || 0,
+          pending: t?.pending || 0,
+          count: t?.count || 0,
+        },
+      };
+    });
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * CEO dashboard: one chapter member profile + all their team donations.
+ * GET /users/:id/chapter-detail
+ */
+export async function getChapterMemberDetailForCeo(req, res, next) {
+  try {
+    const user = await User.findById(req.params.id)
+      .select("-password")
+      .populate("chapter", "name city")
+      .populate("teamDirector", "name email chapterRole phone")
+      .populate("cabinetMember", "name email chapterRole phone")
+      .lean();
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
+    if (!user.chapter) {
+      return res.status(400).json({
+        success: false,
+        message: "This account is not linked to a chapter.",
+      });
+    }
+    if (CEO_DASHBOARD_ROLES.includes(user.systemRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "CEO / Board accounts are not chapter members.",
+      });
+    }
+
+    const donations = await ChapterTeamDonation.find({ donor: user._id })
+      .populate("teamDirector", "name chapterRole")
+      .populate("verifiedBy", "name")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const donationTotals = {
+      pending: 0,
+      verified: 0,
+      rejected: 0,
+      count: donations.length,
+      grandTotal: 0,
+    };
+    for (const d of donations) {
+      const key = d.status || "pending";
+      if (key in donationTotals) donationTotals[key] += d.amount || 0;
+      if (key === "pending" || key === "verified") {
+        donationTotals.grandTotal += d.amount || 0;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: { user, donations, donationTotals },
+    });
   } catch (err) {
     next(err);
   }
@@ -374,7 +672,7 @@ export async function updateUser(req, res, next) {
           "isActive",
         ]
       : asAssigner
-        ? ["name", "phone", "avatar", "chapterRole", "cabinetMember", "isActive"]
+        ? ["name", "phone", "avatar", "chapterRole", "isActive"]
         : ["teamDirector"];
 
     for (const key of allowed) {
@@ -399,7 +697,7 @@ export async function updateUser(req, res, next) {
       if (updates.teamDirector !== undefined) {
         const inCabinet =
           String(refId(target.cabinetMember)) === String(req.user._id) &&
-          target.chapterRole === "member";
+          (target.chapterRole === "member" || target.chapterRole === "assistant_director");
         if (!inCabinet) {
           return res.status(403).json({
             success: false,
@@ -423,35 +721,14 @@ export async function updateUser(req, res, next) {
       }
     }
 
-    // President / VP: assign members to cabinet; set VP / cabinet seats
+    // President / VP: create/change VP & cabinet seats only — members join via cabinet verification
     if (!isLeader && asAssigner) {
-      if (updates.teamDirector !== undefined) {
-        return res.status(400).json({
+      if (updates.teamDirector !== undefined || updates.cabinetMember !== undefined) {
+        return res.status(403).json({
           success: false,
-          message: "President and VP assign members to a cabinet member, not a director.",
+          message:
+            "President and VPs do not assign members. Cabinet heads assign approved members to directors.",
         });
-      }
-      if (updates.cabinetMember !== undefined) {
-        if (target.chapterRole !== "member" && target.chapterRole !== "assistant_director") {
-          return res.status(400).json({
-            success: false,
-            message: "Only members can be assigned to a cabinet.",
-          });
-        }
-        if (updates.cabinetMember) {
-          const cabinet = await User.findById(updates.cabinetMember);
-          if (
-            !cabinet ||
-            !isCabinetRole(cabinet.chapterRole) ||
-            String(cabinet.chapter) !== String(cid)
-          ) {
-            return res.status(400).json({
-              success: false,
-              message: "Pick a valid cabinet member from your chapter.",
-            });
-          }
-        }
-        updates.teamDirector = null;
       }
       if (updates.chapterRole !== undefined) {
         if (
@@ -548,11 +825,45 @@ export async function deleteUser(req, res, next) {
 
     const actorRole = req.user.systemRole;
     const targetRole = target.systemRole;
-    const founderMayDelete = ["ceo", "cto", "coo"];
+    const actorIsLeader = isFullAccessRole(actorRole);
+    const actorIsPresident =
+      actorRole === "president" || req.user.chapterRole === "president";
 
-    if (isFullAccessRole(targetRole)) {
-      const allowed =
-        actorRole === "founder" && founderMayDelete.includes(targetRole);
+    if (!actorIsLeader && !actorIsPresident) {
+      return res.status(403).json({
+        success: false,
+        message: "Only CEO / Founder / CTO / COO, or a chapter president, can delete accounts.",
+      });
+    }
+
+    // President: only chapter members in their own chapter
+    if (actorIsPresident && !actorIsLeader) {
+      const actorChapter = chapterIdOf(req.user);
+      const targetChapter = chapterIdOf(target);
+      if (!actorChapter || !targetChapter || String(actorChapter) !== String(targetChapter)) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only delete members from your own chapter.",
+        });
+      }
+      if (CEO_DASHBOARD_ROLES.includes(targetRole)) {
+        return res.status(403).json({
+          success: false,
+          message: "Chapter presidents cannot delete CEO / Board accounts.",
+        });
+      }
+      if (targetRole === "president" || target.chapterRole === "president") {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot delete the chapter president account.",
+        });
+      }
+    }
+
+    // Full-access: may delete chapter members and BOG; leadership seats stay protected
+    if (actorIsLeader && isFullAccessRole(targetRole)) {
+      const founderMayDelete = ["ceo", "cto", "coo"];
+      const allowed = actorRole === "founder" && founderMayDelete.includes(targetRole);
       if (!allowed) {
         return res.status(403).json({
           success: false,
@@ -564,8 +875,33 @@ export async function deleteUser(req, res, next) {
       }
     }
 
+    const targetChapterId = chapterIdOf(target);
+
+    // Unlink chapter.president if this user was the chapter president
+    if (targetChapterId && (targetRole === "president" || target.chapterRole === "president")) {
+      await Chapter.updateMany(
+        { _id: targetChapterId, president: target._id },
+        { $set: { president: null } },
+      );
+    }
+
+    // Clear references from other users in the chapter
+    if (targetChapterId) {
+      await User.updateMany(
+        { chapter: targetChapterId, teamDirector: target._id },
+        { $set: { teamDirector: null } },
+      );
+      await User.updateMany(
+        { chapter: targetChapterId, cabinetMember: target._id },
+        { $set: { cabinetMember: null } },
+      );
+      await Chapter.findByIdAndUpdate(targetChapterId, { $inc: { memberCount: -1 } }).catch(
+        () => {},
+      );
+    }
+
     await User.findByIdAndDelete(req.params.id);
-    res.json({ success: true, message: "User deleted." });
+    res.json({ success: true, message: "Account deleted." });
   } catch (err) {
     next(err);
   }

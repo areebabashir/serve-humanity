@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   ClipboardCheck,
+  FileSpreadsheet,
   FolderKanban,
   HandCoins,
   Image as ImageIcon,
@@ -68,9 +69,9 @@ const SHORTCUTS = [
   {
     module: "media",
     to: "/chapter/media-cases",
-    title: "Media cases",
-    blurb: "Date, Ref No, Description",
-    icon: ImageIcon,
+    title: "Ref File",
+    blurb: "Media & Graphics reference file",
+    icon: FileSpreadsheet,
   },
   {
     module: "finance",

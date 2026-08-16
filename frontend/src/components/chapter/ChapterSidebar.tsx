@@ -46,6 +46,11 @@ const OPS_SUB = [
   { title: "Ration Cases Status File", to: "/chapter/operations", module: "operations" },
 ] as const;
 
+const MEDIA_SUB = [
+  { title: "Ref File", to: "/chapter/media-cases", icon: FileSpreadsheet },
+  { title: "Gallery & certificates", to: "/chapter/media", icon: ImageIcon },
+] as const;
+
 const NAV: NavItem[] = [
   { title: "My donation", to: "/chapter/my-donation", icon: HandCoins, module: "my-donation" },
   { title: "Team collection", to: "/chapter/team-collection", icon: UsersRound, module: "team-collection" },
@@ -60,14 +65,13 @@ const NAV: NavItem[] = [
   { title: "Members", to: "/chapter/members", icon: Users2, module: "members" },
   { title: "Notifications", to: "/chapter/notifications", icon: Bell, module: "notifications" },
   { title: "Finance", to: "/chapter/finance", icon: Wallet, module: "finance" },
-  {
-    title: "Media Cases",
-    to: "/chapter/media-cases",
-    icon: FileSpreadsheet,
-    module: "media",
-  },
-  { title: "Media & Graphics", to: "/chapter/media", icon: ImageIcon, module: "media" },
   { title: "Documentation", to: "/chapter/documentation", icon: FolderKanban, module: "documentation" },
+  {
+    title: "Case registrations",
+    to: "/chapter/case-registrations",
+    icon: ClipboardCheck,
+    module: "case-registrations",
+  },
   { title: "Reports", to: "/chapter/reports", icon: BarChart3, module: "reports" },
 ];
 
@@ -88,12 +92,15 @@ export function ChapterSidebar() {
   const opsActive =
     location.pathname.startsWith("/chapter/verification") ||
     location.pathname.startsWith("/chapter/operations");
+  const mediaActive = location.pathname.startsWith("/chapter/media");
   const [opsOpen, setOpsOpen] = useState(opsActive);
+  const [mediaOpen, setMediaOpen] = useState(mediaActive);
 
   const showOps =
     canAccessChapterModuleForUser(user, "ops") ||
     canAccessChapterModuleForUser(user, "verification") ||
     canAccessChapterModuleForUser(user, "operations");
+  const showMedia = canAccessChapterModuleForUser(user, "media");
   const visible = NAV.filter((i) => canAccessChapterModuleForUser(user, i.module));
   const opsLinks = OPS_SUB.filter((s) => canAccessChapterModuleForUser(user, s.module));
   const plain = isPlainMember(role);
@@ -135,7 +142,7 @@ export function ChapterSidebar() {
           </NavLink>
         </div>
 
-        {(showOps || visible.length > 0) && (
+        {(showOps || showMedia || visible.length > 0) && (
           <div>
             <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               {plain ? "Donations" : "Operations"}
@@ -182,6 +189,48 @@ export function ChapterSidebar() {
                             {s.title}
                           </NavLink>
                         ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {showMedia && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setMediaOpen((v) => !v)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm transition",
+                      mediaActive
+                        ? "bg-brand-blue/10 font-semibold text-brand-blue"
+                        : "text-foreground/80 hover:bg-secondary",
+                    )}
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                    <span className="flex-1 text-left">Media & Graphics</span>
+                    <ChevronDown
+                      className={cn("h-4 w-4 transition-transform", mediaOpen && "rotate-180")}
+                    />
+                  </button>
+                  {mediaOpen && (
+                    <div className="ml-4 mt-1 space-y-1 border-l border-border pl-2">
+                      {MEDIA_SUB.map((s) => (
+                        <NavLink
+                          key={s.to}
+                          to={s.to}
+                          end={s.to === "/chapter/media"}
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition",
+                              isActive
+                                ? "bg-brand-orange/10 font-medium text-brand-orange"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                            )
+                          }
+                        >
+                          <s.icon className="h-3.5 w-3.5" />
+                          {s.title}
+                        </NavLink>
+                      ))}
                     </div>
                   )}
                 </div>

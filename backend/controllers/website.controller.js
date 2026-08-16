@@ -34,6 +34,21 @@ function withDefaultSections(page, sections) {
     merged.social = { ...dSocial, ...rSocial };
     return merged;
   }
+  // Need Support page — replace legacy "Volunteer / Join the mission" CMS copy
+  if (page === "volunteer") {
+    const dHero = defaults.hero && typeof defaults.hero === "object" ? defaults.hero : {};
+    const rHero = remote.hero && typeof remote.hero === "object" ? remote.hero : {};
+    const stale =
+      !rHero.title ||
+      rHero.title === "Join the mission" ||
+      rHero.eyebrow === "Volunteer" ||
+      String(rHero.description || "").includes("12,500 volunteers");
+    return {
+      ...defaults,
+      ...remote,
+      hero: stale ? { ...dHero } : { ...dHero, ...rHero },
+    };
+  }
   if (page !== "about") {
     return { ...defaults, ...remote };
   }

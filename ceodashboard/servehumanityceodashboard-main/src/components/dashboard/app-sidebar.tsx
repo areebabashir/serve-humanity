@@ -75,6 +75,7 @@ const OPS_NAV = [
 
 const items = [
   { title: "Overview", url: "/", module: "overview", icon: LayoutDashboard },
+  { title: "Donate", url: "/donate", module: "donate", icon: HandCoins },
   { title: "Chapters", url: "/chapters", module: "chapters", icon: Building2 },
   { title: "Roles & Permissions", url: "/roles", module: "roles", icon: ShieldCheck },
   {

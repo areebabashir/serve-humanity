@@ -18,6 +18,7 @@ import { Route as DashboardBoardRouteImport } from './routes/_dashboard.board'
 import { Route as DashboardChaptersRouteImport } from './routes/_dashboard.chapters'
 import { Route as DashboardContactMessagesRouteImport } from './routes/_dashboard.contact-messages'
 import { Route as DashboardDocumentationRouteImport } from './routes/_dashboard.documentation'
+import { Route as DashboardDonateRouteImport } from './routes/_dashboard.donate'
 import { Route as DashboardFinanceRouteImport } from './routes/_dashboard.finance'
 import { Route as DashboardMediaRouteImport } from './routes/_dashboard.media'
 import { Route as DashboardNewsletterRouteImport } from './routes/_dashboard.newsletter'
@@ -94,6 +95,11 @@ const DashboardContactMessagesRoute =
 const DashboardDocumentationRoute = DashboardDocumentationRouteImport.update({
   id: '/documentation',
   path: '/documentation',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardDonateRoute = DashboardDonateRouteImport.update({
+  id: '/donate',
+  path: '/donate',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardFinanceRoute = DashboardFinanceRouteImport.update({
@@ -281,6 +287,7 @@ export interface FileRoutesByFullPath {
   '/chapters': typeof DashboardChaptersRoute
   '/contact-messages': typeof DashboardContactMessagesRoute
   '/documentation': typeof DashboardDocumentationRouteWithChildren
+  '/donate': typeof DashboardDonateRoute
   '/finance': typeof DashboardFinanceRouteWithChildren
   '/media': typeof DashboardMediaRouteWithChildren
   '/newsletter': typeof DashboardNewsletterRoute
@@ -321,6 +328,7 @@ export interface FileRoutesByTo {
   '/board': typeof DashboardBoardRoute
   '/chapters': typeof DashboardChaptersRoute
   '/contact-messages': typeof DashboardContactMessagesRoute
+  '/donate': typeof DashboardDonateRoute
   '/newsletter': typeof DashboardNewsletterRoute
   '/notifications': typeof DashboardNotificationsRoute
   '/operations': typeof DashboardOperationsRoute
@@ -363,6 +371,7 @@ export interface FileRoutesById {
   '/_dashboard/chapters': typeof DashboardChaptersRoute
   '/_dashboard/contact-messages': typeof DashboardContactMessagesRoute
   '/_dashboard/documentation': typeof DashboardDocumentationRouteWithChildren
+  '/_dashboard/donate': typeof DashboardDonateRoute
   '/_dashboard/finance': typeof DashboardFinanceRouteWithChildren
   '/_dashboard/media': typeof DashboardMediaRouteWithChildren
   '/_dashboard/newsletter': typeof DashboardNewsletterRoute
@@ -408,6 +417,7 @@ export interface FileRouteTypes {
     | '/chapters'
     | '/contact-messages'
     | '/documentation'
+    | '/donate'
     | '/finance'
     | '/media'
     | '/newsletter'
@@ -448,6 +458,7 @@ export interface FileRouteTypes {
     | '/board'
     | '/chapters'
     | '/contact-messages'
+    | '/donate'
     | '/newsletter'
     | '/notifications'
     | '/operations'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/_dashboard/chapters'
     | '/_dashboard/contact-messages'
     | '/_dashboard/documentation'
+    | '/_dashboard/donate'
     | '/_dashboard/finance'
     | '/_dashboard/media'
     | '/_dashboard/newsletter'
@@ -594,6 +606,13 @@ declare module '@tanstack/react-router' {
       path: '/documentation'
       fullPath: '/documentation'
       preLoaderRoute: typeof DashboardDocumentationRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/donate': {
+      id: '/_dashboard/donate'
+      path: '/donate'
+      fullPath: '/donate'
+      preLoaderRoute: typeof DashboardDonateRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/finance': {
@@ -901,6 +920,7 @@ interface DashboardRouteChildren {
   DashboardChaptersRoute: typeof DashboardChaptersRoute
   DashboardContactMessagesRoute: typeof DashboardContactMessagesRoute
   DashboardDocumentationRoute: typeof DashboardDocumentationRouteWithChildren
+  DashboardDonateRoute: typeof DashboardDonateRoute
   DashboardFinanceRoute: typeof DashboardFinanceRouteWithChildren
   DashboardMediaRoute: typeof DashboardMediaRouteWithChildren
   DashboardNewsletterRoute: typeof DashboardNewsletterRoute
@@ -922,6 +942,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardChaptersRoute: DashboardChaptersRoute,
   DashboardContactMessagesRoute: DashboardContactMessagesRoute,
   DashboardDocumentationRoute: DashboardDocumentationRouteWithChildren,
+  DashboardDonateRoute: DashboardDonateRoute,
   DashboardFinanceRoute: DashboardFinanceRouteWithChildren,
   DashboardMediaRoute: DashboardMediaRouteWithChildren,
   DashboardNewsletterRoute: DashboardNewsletterRoute,

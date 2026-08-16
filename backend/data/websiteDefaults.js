@@ -10,7 +10,7 @@ export const DEFAULT_WEBSITE_CONTENT = {
         "A world where compassion meets action. Join thousands of volunteers creating lasting change in communities that need it most.",
       primaryCta: "Donate Now",
       primaryCtaLink: "/donate",
-      secondaryCta: "Become Volunteer",
+      secondaryCta: "Need Support",
       secondaryCtaLink: "/volunteer",
     },
     stats: [
@@ -351,11 +351,11 @@ export const DEFAULT_WEBSITE_CONTENT = {
 
   volunteer: {
     hero: {
-      eyebrow: "Volunteer",
-      title: "Join the mission",
-      titleHighlight: "mission",
+      eyebrow: "Need support",
+      title: "Request help for a deserving family",
+      titleHighlight: "deserving family",
       description:
-        "12,500 volunteers across 36 cities. There's a place for you — whatever your skills, hours, or background.",
+        "If you or a family needs support, fill this form. Choose a chapter — it goes to that chapter’s president, vice president, and documentation cabinet.",
     },
     perks: [
       { title: "Real Community", body: "Meet the most kind-hearted people you'll ever know." },

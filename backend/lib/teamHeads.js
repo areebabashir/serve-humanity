@@ -1,6 +1,6 @@
 /**
  * Chapter hierarchy:
- * President / VP
+ * President / VPs (female + male)
  *   └── Cabinet (finance, ops, verification, documentation, media)
  *         └── Directors (team collection)
  *               └── Members
@@ -16,6 +16,8 @@ export const CABINET_ROLES = [
 /** @deprecated alias — cabinet seats (legacy name "team heads") */
 export const TEAM_HEAD_ROLES = CABINET_ROLES;
 
+export const VP_ROLES = ["vice_president", "vice_president_male"];
+
 export function isCabinetRole(role) {
   return CABINET_ROLES.includes(role);
 }
@@ -23,6 +25,10 @@ export function isCabinetRole(role) {
 /** @deprecated use isCabinetRole */
 export function isTeamHeadRole(role) {
   return isCabinetRole(role);
+}
+
+export function isVicePresidentRole(role) {
+  return VP_ROLES.includes(role);
 }
 
 /** Directors under a cabinet member — own a team collection */
@@ -37,8 +43,8 @@ export function isValidTeamLeadRole(role) {
 
 /** Leadership with personal donations only (no director team). */
 export function isOwnCollectionRole(role) {
-  return role === "president" || role === "vice_president";
+  return role === "president" || isVicePresidentRole(role);
 }
 
 /** Roles president / VP may create / assign as seats */
-export const CABINET_ASSIGNABLE_ROLES = ["vice_president", ...CABINET_ROLES];
+export const CABINET_ASSIGNABLE_ROLES = [...VP_ROLES, ...CABINET_ROLES];

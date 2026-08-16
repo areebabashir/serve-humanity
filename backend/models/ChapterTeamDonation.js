@@ -4,7 +4,7 @@ import mongoose from "mongoose";
  * Individual chapter member donations (amount + optional screenshot).
  * Counts toward a director's team collection until verified by
  * the finance director. President / VP donations have no teamDirector
- * (own collection only).
+ * (own collection only). BOG/CEO-board donations use source "bog".
  */
 const chapterTeamDonationSchema = new mongoose.Schema(
   {
@@ -27,6 +27,13 @@ const chapterTeamDonationSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    /** chapter = chapter team member; bog = CEO/Board/BOG donation into a chapter */
+    source: {
+      type: String,
+      enum: ["chapter", "bog"],
+      default: "chapter",
+      index: true,
+    },
     amount: { type: Number, required: true, min: 0 },
     screenshotUrl: { type: String, default: "" },
     screenshotPublicId: { type: String, default: "" },
@@ -45,6 +52,7 @@ const chapterTeamDonationSchema = new mongoose.Schema(
 
 chapterTeamDonationSchema.index({ chapter: 1, teamDirector: 1, status: 1 });
 chapterTeamDonationSchema.index({ donor: 1, createdAt: -1 });
+chapterTeamDonationSchema.index({ source: 1, status: 1, createdAt: -1 });
 
 const ChapterTeamDonation = mongoose.model("ChapterTeamDonation", chapterTeamDonationSchema);
 export default ChapterTeamDonation;

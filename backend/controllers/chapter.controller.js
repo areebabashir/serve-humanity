@@ -5,10 +5,12 @@ import Member from "../models/Member.js";
 import Donation from "../models/Donation.js";
 import ChapterTeamDonation from "../models/ChapterTeamDonation.js";
 import WelfareCase from "../models/WelfareCase.js";
+import DocumentationFile from "../models/DocumentationFile.js";
 import { TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
 import { uploadToCloudinary } from "../middleware/upload.js";
 
 const PRESIDENT_FIELDS = "name email phone avatar systemRole chapterRole lastLogin isActive";
+const CASE_DOC_TYPES = ["health", "marriage", "fee", "ration"];
 
 async function fundsRaisedByChapterIds() {
   const [teamFundsByChapter, publicFundsByChapter] = await Promise.all([
@@ -69,16 +71,75 @@ function resolveFundsRaised(chapterId, stored, liveMap) {
   return live > 0 ? live : stored ?? 0;
 }
 
+/** Count active chapter logins (president + members) — used on public website */
+async function userMemberCountsByChapterIds(chapterIds) {
+  if (!chapterIds?.length) return new Map();
+  const oids = chapterIds.map((id) =>
+    id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(String(id)),
+  );
+  const rows = await User.aggregate([
+    {
+      $match: {
+        chapter: { $in: oids },
+        isActive: { $ne: false },
+        systemRole: { $in: ["member", "president"] },
+      },
+    },
+    { $group: { _id: "$chapter", count: { $sum: 1 } } },
+  ]);
+  const map = new Map();
+  for (const r of rows) map.set(String(r._id), r.count || 0);
+  return map;
+}
+
+/** Live case totals per chapter (documentation cases + welfare cases) */
+async function caseCountsByChapterIds(chapterIds) {
+  if (!chapterIds?.length) return new Map();
+  const oids = chapterIds.map((id) =>
+    id instanceof mongoose.Types.ObjectId ? id : new mongoose.Types.ObjectId(String(id)),
+  );
+  const [docRows, welfareRows] = await Promise.all([
+    DocumentationFile.aggregate([
+      {
+        $match: {
+          chapter: { $in: oids },
+          type: { $in: CASE_DOC_TYPES },
+        },
+      },
+      { $group: { _id: "$chapter", count: { $sum: 1 } } },
+    ]),
+    WelfareCase.aggregate([
+      { $match: { chapter: { $in: oids } } },
+      { $group: { _id: "$chapter", count: { $sum: 1 } } },
+    ]),
+  ]);
+  const map = new Map();
+  for (const r of docRows || []) {
+    map.set(String(r._id), (map.get(String(r._id)) || 0) + (r.count || 0));
+  }
+  for (const r of welfareRows || []) {
+    map.set(String(r._id), (map.get(String(r._id)) || 0) + (r.count || 0));
+  }
+  return map;
+}
+
 export async function getAllChapters(req, res, next) {
   try {
     const { status } = req.query;
     const filter = status ? { status } : {};
-    const [chapters, liveMap] = await Promise.all([
-      Chapter.find(filter).populate("president", PRESIDENT_FIELDS).sort({ name: 1 }).lean(),
+    const chapters = await Chapter.find(filter)
+      .populate("president", PRESIDENT_FIELDS)
+      .sort({ name: 1 })
+      .lean();
+    const [liveMap, memberMap, caseMap] = await Promise.all([
       fundsRaisedByChapterIds(),
+      userMemberCountsByChapterIds(chapters.map((c) => c._id)),
+      caseCountsByChapterIds(chapters.map((c) => c._id)),
     ]);
     const data = chapters.map((c) => ({
       ...c,
+      memberCount: memberMap.get(String(c._id)) ?? c.memberCount ?? 0,
+      casesClosed: caseMap.get(String(c._id)) ?? c.casesClosed ?? 0,
       fundsRaised: resolveFundsRaised(c._id, c.fundsRaised, liveMap),
     }));
     res.json({ success: true, total: data.length, data });
@@ -90,12 +151,15 @@ export async function getAllChapters(req, res, next) {
 /** Public website listing — active chapters only, display fields. */
 export async function getPublicChapters(req, res, next) {
   try {
-    const [chapters, liveMap] = await Promise.all([
-      Chapter.find({ status: "active" })
-        .populate("president", "name")
-        .sort({ city: 1, name: 1 })
-        .lean(),
+    const chapters = await Chapter.find({ status: "active" })
+      .populate("president", "name")
+      .sort({ city: 1, name: 1 })
+      .lean();
+
+    const [liveMap, memberMap, caseMap] = await Promise.all([
       fundsRaisedByChapterIds(),
+      userMemberCountsByChapterIds(chapters.map((c) => c._id)),
+      caseCountsByChapterIds(chapters.map((c) => c._id)),
     ]);
 
     const data = chapters.map((c) => ({
@@ -104,8 +168,8 @@ export async function getPublicChapters(req, res, next) {
       city: c.city,
       imageUrl: c.imageUrl || "",
       president: c.president?.name || "TBD",
-      members: c.memberCount ?? 0,
-      projects: c.casesClosed ?? 0,
+      members: memberMap.get(String(c._id)) ?? c.memberCount ?? 0,
+      projects: caseMap.get(String(c._id)) ?? c.casesClosed ?? 0,
       events: c.totalEvents ?? 0,
       fundsRaised: resolveFundsRaised(c._id, c.fundsRaised, liveMap),
       donationAccounts: (c.donationAccounts || [])
@@ -672,13 +736,23 @@ export async function getChapterStats(req, res, next) {
     if (!chapter) return res.status(404).json({ success: false, message: "Chapter not found." });
 
     const [memberCount, activeCases, totalDonations] = await Promise.all([
-      Member.countDocuments({ chapter: chapter._id, status: "active" }),
+      User.countDocuments({
+        chapter: chapter._id,
+        isActive: { $ne: false },
+        systemRole: { $in: ["member", "president"] },
+      }),
       WelfareCase.countDocuments({ chapter: chapter._id, status: { $nin: ["closed", "rejected"] } }),
       Donation.aggregate([
         { $match: { chapter: chapter._id } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
     ]);
+
+    // Keep denormalized field in sync for dashboards that still read it
+    if (chapter.memberCount !== memberCount) {
+      chapter.memberCount = memberCount;
+      await chapter.save();
+    }
 
     res.json({
       success: true,

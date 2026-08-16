@@ -56,11 +56,11 @@ export const ROLE_MODULES: Record<OrgRole, string[]> = {
   founder: ["*"],
   cto: ["*"],
   coo: ["*"],
-  bog_verification: ["overview", "ops", "board", "notifications"],
-  bog_operations: ["overview", "ops", "board", "notifications"],
-  bog_media: ["overview", "media", "website", "board", "notifications"],
-  bog_finance: ["overview", "finance", "board", "notifications"],
-  bog_documentation: ["overview", "documentation", "board", "notifications"],
+  bog_verification: ["overview", "ops", "board", "donate", "notifications"],
+  bog_operations: ["overview", "ops", "board", "donate", "notifications"],
+  bog_media: ["overview", "media", "website", "board", "donate", "notifications"],
+  bog_finance: ["overview", "finance", "board", "donate", "notifications"],
+  bog_documentation: ["overview", "documentation", "board", "donate", "notifications"],
 };
 
 export function canAccessModule(role: OrgRole, module: string): boolean {
@@ -86,6 +86,7 @@ export function moduleFromPath(pathname: string): string {
   if (pathname.startsWith("/documentation")) return "documentation";
   if (pathname.startsWith("/verification") || pathname.startsWith("/operations")) return "ops";
   if (pathname.startsWith("/reviews") || pathname.startsWith("/contact-messages") || pathname.startsWith("/website-events") || pathname.startsWith("/newsletter")) return "website";
+  if (pathname.startsWith("/donate")) return "donate";
   const seg = pathname.split("/").filter(Boolean)[0] ?? "";
   return seg || "overview";
 }

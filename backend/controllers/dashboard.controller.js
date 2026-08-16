@@ -41,7 +41,7 @@ const DIRECTOR_CHAPTER_ROLES = [
   "assistant_director",
 ];
 
-const PRESIDENT_CHAPTER_ROLES = ["president", "vice_president"];
+const PRESIDENT_CHAPTER_ROLES = ["president", "vice_president", "vice_president_male"];
 
 function startOfMonth(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -112,6 +112,59 @@ async function dailyTotals(Model, match) {
   return map;
 }
 
+/** Chapter login accounts that joined (createdAt), excluding CEO/board & public. */
+async function monthlyMemberJoins(chapterMatch, fromDate) {
+  const match = {
+    systemRole: { $nin: [...CEO_DASHBOARD_ROLES, "public"] },
+    createdAt: { $gte: fromDate },
+  };
+  if (chapterMatch.chapter) match.chapter = chapterMatch.chapter;
+  else match.chapter = { $ne: null };
+
+  const rows = await User.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+  const map = new Map();
+  for (const r of rows) {
+    map.set(`${r._id.year}-${r._id.month}`, r.total || 0);
+  }
+  return map;
+}
+
+async function dailyMemberJoins(chapterMatch, range) {
+  const match = {
+    systemRole: { $nin: [...CEO_DASHBOARD_ROLES, "public"] },
+    ...range,
+  };
+  if (chapterMatch.chapter) match.chapter = chapterMatch.chapter;
+  else match.chapter = { $ne: null };
+
+  const rows = await User.aggregate([
+    { $match: match },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" },
+          day: { $dayOfMonth: "$createdAt" },
+        },
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+  const map = new Map();
+  for (const r of rows) {
+    map.set(`${r._id.year}-${r._id.month}-${r._id.day}`, r.total || 0);
+  }
+  return map;
+}
+
 function relativeTime(iso) {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
@@ -141,7 +194,6 @@ export async function getTrend(req, res, next) {
     const chapterMatch = chapterId ? { chapter: chapterId } : {};
     const donStatus = { status: { $in: ["confirmed", "pending"] } };
     const teamStatus = { status: { $in: ["verified", "pending"] } };
-    const expStatus = { status: { $in: ["approved", "sent_to_ceo", "pending"] } };
 
     const monthMatch = /^(\d{4})-(\d{1,2})$/.exec(monthRaw);
     if (monthMatch) {
@@ -154,10 +206,10 @@ export async function getTrend(req, res, next) {
       const to = new Date(year, month, 1);
       const range = { createdAt: { $gte: from, $lt: to } };
 
-      const [publicDays, teamDays, expenseDays] = await Promise.all([
+      const [publicDays, teamDays, memberDays] = await Promise.all([
         dailyTotals(Donation, { ...donStatus, ...chapterMatch, ...range }),
         dailyTotals(ChapterTeamDonation, { ...teamStatus, ...chapterMatch, ...range }),
-        dailyTotals(Expense, { ...expStatus, ...chapterMatch, ...range }),
+        dailyMemberJoins(chapterMatch, range),
       ]);
 
       const daysInMonth = new Date(year, month, 0).getDate();
@@ -168,12 +220,12 @@ export async function getTrend(req, res, next) {
           month: String(day),
           label: `${MONTH_SHORT[month - 1]} ${day}`,
           donations: (publicDays.get(key) || 0) + (teamDays.get(key) || 0),
-          expenses: expenseDays.get(key) || 0,
+          membersJoined: memberDays.get(key) || 0,
         });
       }
 
       const donations = points.reduce((s, p) => s + p.donations, 0);
-      const expenses = points.reduce((s, p) => s + p.expenses, 0);
+      const membersJoined = points.reduce((s, p) => s + p.membersJoined, 0);
 
       return res.json({
         success: true,
@@ -182,7 +234,7 @@ export async function getTrend(req, res, next) {
           month: `${year}-${String(month).padStart(2, "0")}`,
           chapter: chapterId ? String(chapterId) : "all",
           points,
-          totals: { donations, expenses },
+          totals: { donations, membersJoined },
         },
       });
     }
@@ -190,22 +242,22 @@ export async function getTrend(req, res, next) {
     const trendMonths = monthsBack(12);
     const trendFrom = new Date(trendMonths[0].year, trendMonths[0].month - 1, 1);
 
-    const [publicDonMonthMap, teamDonMonthMap, expenseMonthMap] = await Promise.all([
+    const [publicDonMonthMap, teamDonMonthMap, memberMonthMap] = await Promise.all([
       monthlyTotals(Donation, { ...donStatus, ...chapterMatch }, trendFrom),
       monthlyTotals(ChapterTeamDonation, { ...teamStatus, ...chapterMatch }, trendFrom),
-      monthlyTotals(Expense, { ...expStatus, ...chapterMatch }, trendFrom),
+      monthlyMemberJoins(chapterMatch, trendFrom),
     ]);
 
     const points = trendMonths.map((m) => {
       const donations =
         (publicDonMonthMap.get(m.key) || 0) + (teamDonMonthMap.get(m.key) || 0);
-      const expenses = expenseMonthMap.get(m.key) || 0;
+      const membersJoined = memberMonthMap.get(m.key) || 0;
       return {
         month: m.label,
         label: `${m.label} ${m.year}`,
         key: `${m.year}-${String(m.month).padStart(2, "0")}`,
         donations,
-        expenses,
+        membersJoined,
       };
     });
 
@@ -224,7 +276,7 @@ export async function getTrend(req, res, next) {
         momPct,
         totals: {
           donations: points.reduce((s, p) => s + p.donations, 0),
-          expenses: points.reduce((s, p) => s + p.expenses, 0),
+          membersJoined: points.reduce((s, p) => s + p.membersJoined, 0),
         },
       },
     });
@@ -263,7 +315,7 @@ export async function getOverview(req, res, next) {
       teamDonationsYTD,
       publicDonMonthMap,
       teamDonMonthMap,
-      expenseMonthMap,
+      memberMonthMap,
       activeCases,
       pendingCeoCases,
       stalePendingCases,
@@ -344,11 +396,7 @@ export async function getOverview(req, res, next) {
         { status: { $in: ["verified", "pending"] } },
         trendFrom,
       ),
-      monthlyTotals(
-        Expense,
-        { status: { $in: ["approved", "sent_to_ceo", "pending"] } },
-        trendFrom,
-      ),
+      monthlyMemberJoins({}, trendFrom),
       WelfareCase.countDocuments({
         status: { $nin: ["closed", "rejected", "disbursed"] },
       }),
@@ -458,11 +506,25 @@ export async function getOverview(req, res, next) {
       (publicFundsByChapter || []).map((r) => [String(r._id), r.total || 0]),
     );
 
+    const userMemberRows = await User.aggregate([
+      {
+        $match: {
+          chapter: { $ne: null },
+          isActive: { $ne: false },
+          systemRole: { $in: ["member", "president"] },
+        },
+      },
+      { $group: { _id: "$chapter", count: { $sum: 1 } } },
+    ]);
+    const userMemberMap = new Map(
+      (userMemberRows || []).map((r) => [String(r._id), r.count || 0]),
+    );
+
     const trend = trendMonths.map((m) => {
       const donations =
         (publicDonMonthMap.get(m.key) || 0) + (teamDonMonthMap.get(m.key) || 0);
-      const expenses = expenseMonthMap.get(m.key) || 0;
-      return { month: m.label, donations, expenses };
+      const membersJoined = memberMonthMap.get(m.key) || 0;
+      return { month: m.label, donations, membersJoined };
     });
 
     // MoM donation change (last complete-ish month vs previous)
@@ -551,7 +613,7 @@ export async function getOverview(req, res, next) {
           name: c.name,
           city: c.city,
           president: c.president?.name || "TBD",
-          members: c.memberCount ?? 0,
+          members: userMemberMap.get(id) ?? c.memberCount ?? 0,
           casesClosed: c.casesClosed ?? 0,
           events: c.totalEvents ?? 0,
           fundsRaised: liveRaised > 0 ? liveRaised : c.fundsRaised ?? 0,

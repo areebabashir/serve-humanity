@@ -49,7 +49,8 @@ export function isChapterLeadership(user) {
   return (
     user?.systemRole === "president" ||
     user?.chapterRole === "president" ||
-    user?.chapterRole === "vice_president"
+    user?.chapterRole === "vice_president" ||
+    user?.chapterRole === "vice_president_male"
   );
 }
 
