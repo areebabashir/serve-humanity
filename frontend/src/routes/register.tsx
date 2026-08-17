@@ -137,7 +137,8 @@ export default function RegisterPage() {
             </div>
             <h1 className="mt-6 text-center font-display text-2xl font-bold">Create account</h1>
             <p className="mt-1 text-center text-sm text-muted-foreground">
-              Select your chapter and team. Leadership must approve before you can sign in.
+              Select your chapter and team. After one approval from the president, a VP, or that
+              team&apos;s cabinet head, you can sign in.
             </p>
 
             {successMsg ? (

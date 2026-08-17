@@ -98,6 +98,13 @@ function refId(u: AuthUser, key: "cabinetMember" | "teamDirector"): string {
   return idOfRef(u[key]) || "none";
 }
 
+type JoinApproval = {
+  leadershipApproved?: boolean;
+  cabinetApproved?: boolean;
+  leadershipApprovedBy?: { name?: string } | null;
+  cabinetApprovedBy?: { name?: string } | null;
+};
+
 type JoinRequest = {
   _id: string;
   name: string;
@@ -106,6 +113,7 @@ type JoinRequest = {
   requestedCabinetRole?: string;
   teamLabel?: string;
   createdAt?: string;
+  approvals?: JoinApproval;
 };
 
 const emptyForm = {
@@ -194,8 +202,13 @@ export default function ChapterTeamPage() {
   async function reviewJoin(id: string, action: "approve" | "reject") {
     setJoinBusyId(id);
     try {
-      await api(`/users/${id}/join-${action}`, { method: "PATCH" });
-      toast.success(action === "approve" ? "Member approved — they can log in now" : "Join request rejected");
+      const res = await api<{ success: true; message?: string }>(`/users/${id}/join-${action}`, {
+        method: "PATCH",
+      });
+      toast.success(
+        res.message ||
+          (action === "approve" ? "Approval recorded" : "Join request rejected"),
+      );
       await load();
     } catch (err) {
       toast.error(err instanceof ApiRequestError ? err.message : "Update failed");
@@ -446,8 +459,8 @@ export default function ChapterTeamPage() {
           <div className="border-b border-border px-4 py-3">
             <h3 className="text-sm font-semibold">Pending join requests</h3>
             <p className="text-xs text-muted-foreground">
-              Approve so the member can log in. Notified: president, both VPs, and the selected
-              team&apos;s cabinet head.
+              Any one of the president, a VP, or this team&apos;s cabinet head can approve. After
+              that, the member can log in.
             </p>
           </div>
           <Table>

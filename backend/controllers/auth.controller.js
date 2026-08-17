@@ -47,33 +47,27 @@ function generateResetCode() {
 }
 
 async function findJoinApprovers(chapterId, requestedCabinetRole) {
-  const roles = ["president", "vice_president", "vice_president_male"];
-  if (requestedCabinetRole) roles.push(requestedCabinetRole);
+  const leadershipRoles = ["president", "vice_president", "vice_president_male"];
+  const cabinetRoles = requestedCabinetRole ? [requestedCabinetRole] : [];
 
   const byId = new Map();
-
-  const roleMatches = await User.find({
+  const active = {
     chapter: chapterId,
     isActive: { $ne: false },
-    membershipStatus: { $ne: "pending" },
-    chapterRole: { $in: roles },
+    membershipStatus: { $nin: ["pending", "rejected"] },
+  };
+
+  const matches = await User.find({
+    ...active,
+    $or: [
+      { chapterRole: { $in: [...leadershipRoles, ...cabinetRoles] } },
+      { systemRole: "president" },
+    ],
   })
     .select("name email chapterRole systemRole")
     .lean();
 
-  for (const u of roleMatches) byId.set(String(u._id), u);
-
-  const presidents = await User.find({
-    chapter: chapterId,
-    systemRole: "president",
-    isActive: { $ne: false },
-    membershipStatus: { $ne: "pending" },
-  })
-    .select("name email chapterRole systemRole")
-    .lean();
-
-  for (const u of presidents) byId.set(String(u._id), u);
-
+  for (const u of matches) byId.set(String(u._id), u);
   return [...byId.values()];
 }
 
@@ -142,7 +136,9 @@ export async function register(req, res, next) {
     const notifBody = [
       `${user.name} (${user.email}) requested to join the ${teamLabel} team.`,
       `Chapter: ${chapterDoc.name}${chapterDoc.city ? ` (${chapterDoc.city})` : ""}.`,
-      `Open Team & Roles to approve or reject. Until approved, they cannot log in.`,
+      `This request goes to the president, both vice presidents, and the ${teamLabel} cabinet head.`,
+      `Any one of them can approve. Until then, they cannot log in.`,
+      `Open Team & Roles to approve or reject.`,
     ].join("\n");
 
     if (approvers.length > 0) {
@@ -200,7 +196,7 @@ export async function register(req, res, next) {
       success: true,
       pendingApproval: true,
       message:
-        "Registration submitted. The chapter president, vice presidents, and that team's cabinet head must approve before you can log in.",
+        "Registration submitted. Wait for the president, a vice president, or that team's cabinet head to approve before you can log in.",
       data: {
         email: user.email,
         chapter: { _id: chapterDoc._id, name: chapterDoc.name, city: chapterDoc.city },
@@ -234,7 +230,7 @@ export async function login(req, res, next) {
       return res.status(403).json({
         success: false,
         message:
-          "Your join request is still pending. The chapter president, vice presidents, or your team's cabinet head must approve it before you can log in.",
+          "Your join request is still pending. The president, a vice president, or your team's cabinet head must approve it before you can log in.",
       });
     }
 

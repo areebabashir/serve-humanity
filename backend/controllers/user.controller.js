@@ -55,15 +55,33 @@ function isCabinetUser(user) {
   return isCabinetRole(user?.chapterRole);
 }
 
+function isLeadershipApprover(user) {
+  return isChapterPresident(user) || isVicePresidentRole(user?.chapterRole);
+}
+
+function isCabinetApproverFor(user, applicant) {
+  return (
+    isCabinetRole(user?.chapterRole) &&
+    user.chapterRole === applicant.requestedCabinetRole
+  );
+}
+
 function canReviewJoinRequest(reviewer, applicant) {
   if (!reviewer || !applicant) return false;
   const cid = chapterIdOf(reviewer);
   if (!cid || String(applicant.chapter) !== String(cid)) return false;
-  if (isChapterPresident(reviewer) || isVicePresidentRole(reviewer.chapterRole)) return true;
-  return (
-    isCabinetRole(reviewer.chapterRole) &&
-    reviewer.chapterRole === applicant.requestedCabinetRole
-  );
+  return isLeadershipApprover(reviewer) || isCabinetApproverFor(reviewer, applicant);
+}
+
+function joinApprovalState(u) {
+  return {
+    leadershipApproved: Boolean(u.leadershipApprovedBy),
+    cabinetApproved: Boolean(u.cabinetApprovedBy),
+    leadershipApprovedBy: u.leadershipApprovedBy || null,
+    cabinetApprovedBy: u.cabinetApprovedBy || null,
+    leadershipApprovedAt: u.leadershipApprovedAt || null,
+    cabinetApprovedAt: u.cabinetApprovedAt || null,
+  };
 }
 
 function refId(ref) {
@@ -349,7 +367,7 @@ export async function listJoinRequests(req, res, next) {
       });
     }
 
-    const isLeader = isChapterPresident(req.user) || isVicePresidentRole(req.user.chapterRole);
+    const isLeader = isLeadershipApprover(req.user);
     const isCabinetHead = isCabinetRole(req.user.chapterRole);
     if (!isLeader && !isCabinetHead) {
       return res.status(403).json({ success: false, message: "Access denied." });
@@ -367,6 +385,8 @@ export async function listJoinRequests(req, res, next) {
 
     const data = await User.find(filter)
       .select("-password")
+      .populate("leadershipApprovedBy", "name email chapterRole")
+      .populate("cabinetApprovedBy", "name email chapterRole")
       .sort({ createdAt: -1 })
       .lean();
 
@@ -376,6 +396,7 @@ export async function listJoinRequests(req, res, next) {
       data: data.map((u) => ({
         ...u,
         teamLabel: TEAM_LABEL[u.requestedCabinetRole] || u.requestedCabinetRole || "—",
+        approvals: joinApprovalState(u),
       })),
     });
   } catch (err) {
@@ -385,7 +406,7 @@ export async function listJoinRequests(req, res, next) {
 
 /**
  * PATCH /users/:id/join-approve
- * Any one of president / VPs / that team's cabinet head can approve.
+ * Any one of president / VPs / that team's cabinet head can approve — then they can log in.
  */
 export async function approveJoinRequest(req, res, next) {
   try {
@@ -400,24 +421,30 @@ export async function approveJoinRequest(req, res, next) {
       });
     }
 
-    const chapterId = chapterIdOf(applicant);
-    let cabinetHead = null;
-    if (applicant.requestedCabinetRole) {
-      cabinetHead = await User.findOne({
-        chapter: chapterId,
-        chapterRole: applicant.requestedCabinetRole,
-        isActive: { $ne: false },
-        membershipStatus: { $ne: "pending" },
-      }).select("_id");
+    if (isLeadershipApprover(req.user)) {
+      applicant.leadershipApprovedBy = req.user._id;
+      applicant.leadershipApprovedAt = new Date();
+    } else if (isCabinetApproverFor(req.user, applicant)) {
+      applicant.cabinetApprovedBy = req.user._id;
+      applicant.cabinetApprovedAt = new Date();
     }
+
+    const chapterId = chapterIdOf(applicant);
+    const cabinetHead = applicant.requestedCabinetRole
+      ? await User.findOne({
+          chapter: chapterId,
+          chapterRole: applicant.requestedCabinetRole,
+          isActive: { $ne: false },
+          membershipStatus: { $nin: ["pending", "rejected"] },
+        }).select("_id")
+      : null;
 
     applicant.membershipStatus = "approved";
     applicant.membershipApprovedBy = req.user._id;
     applicant.membershipApprovedAt = new Date();
-    applicant.cabinetMember = cabinetHead?._id || null;
+    applicant.cabinetMember = cabinetHead?._id || applicant.cabinetApprovedBy || null;
     applicant.teamDirector = null;
     await applicant.save();
-
     await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
 
     const safe = await User.findById(applicant._id)

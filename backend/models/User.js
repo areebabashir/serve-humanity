@@ -117,6 +117,20 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    /** President or VP who signed off on the join request */
+    leadershipApprovedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    leadershipApprovedAt: { type: Date, default: null },
+    /** Cabinet head of the requested team who signed off */
+    cabinetApprovedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    cabinetApprovedAt: { type: Date, default: null },
     membershipApprovedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
