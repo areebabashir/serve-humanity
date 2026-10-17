@@ -347,22 +347,29 @@ export async function getChapterDetails(req, res, next) {
       count: { $sum: 1 },
     };
 
+    const caseBaseFilter = {
+      chapter: chapterOid,
+      type: { $in: CASE_DOC_TYPES },
+    };
+
     const [
       team,
-      members,
       teamDonationMonths,
       publicDonationMonths,
       teamStatusTotals,
       activeCases,
+      casesClosed,
+      cases,
       recentTeamDonations,
     ] = await Promise.all([
       User.find({ chapter: chapterOid })
-        .select("name email phone chapterRole systemRole teamDirector cabinetMember lastLogin avatar isActive")
+        .select(
+          "name email phone chapterRole systemRole teamDirector cabinetMember lastLogin avatar isActive membershipStatus requestedCabinetRole createdAt",
+        )
         .populate("teamDirector", "name email chapterRole")
         .populate("cabinetMember", "name email chapterRole")
         .sort({ chapterRole: 1, name: 1 })
         .lean(),
-      Member.find({ chapter: chapterOid }).sort({ joinedAt: -1 }).lean(),
       ChapterTeamDonation.aggregate([
         { $match: { chapter: chapterOid } },
         {
@@ -387,10 +394,27 @@ export async function getChapterDetails(req, res, next) {
         { $match: { chapter: chapterOid } },
         { $group: { _id: "$status", total: { $sum: "$amount" }, count: { $sum: 1 } } },
       ]),
-      WelfareCase.countDocuments({
-        chapter: chapterOid,
-        status: { $nin: ["closed", "rejected"] },
+      // Documentation case board (health / marriage / fee / ration) — not legacy WelfareCase
+      DocumentationFile.countDocuments({
+        ...caseBaseFilter,
+        $or: [
+          { caseStatus: "pending" },
+          { caseStatus: "running" },
+          { caseStatus: { $exists: false } },
+          { caseStatus: null },
+        ],
       }),
+      DocumentationFile.countDocuments({
+        ...caseBaseFilter,
+        caseStatus: "complete",
+      }),
+      DocumentationFile.find(caseBaseFilter)
+        .select(
+          "type title caseNumber caseStatus approvalStatus status fields createdAt updatedAt createdBy",
+        )
+        .populate("createdBy", "name email chapterRole")
+        .sort({ updatedAt: -1 })
+        .lean(),
       ChapterTeamDonation.find({ chapter: chapterOid })
         .populate("donor", "name email chapterRole")
         .populate("teamDirector", "name email chapterRole")
@@ -422,6 +446,9 @@ export async function getChapterDetails(req, res, next) {
     const chapterPayload = chapter.toObject ? chapter.toObject() : chapter;
     chapterPayload.fundsRaised =
       liveFundsRaised > 0 ? liveFundsRaised : chapter.fundsRaised ?? 0;
+    // Live counts from login accounts + documentation case board
+    chapterPayload.memberCount = team.length;
+    chapterPayload.casesClosed = casesClosed;
 
     res.json({
       success: true,
@@ -429,8 +456,10 @@ export async function getChapterDetails(req, res, next) {
         chapter: chapterPayload,
         president: chapter.president || null,
         team,
-        members,
+        members: team, // all login accounts (general members included) — Members tab removed on UI
+        cases,
         activeCases,
+        casesClosed,
         donationTotals: {
           ...donationTotals,
           grandTotal: (donationTotals.pending || 0) + (donationTotals.verified || 0),
@@ -741,7 +770,16 @@ export async function getChapterStats(req, res, next) {
         isActive: { $ne: false },
         systemRole: { $in: ["member", "president"] },
       }),
-      WelfareCase.countDocuments({ chapter: chapter._id, status: { $nin: ["closed", "rejected"] } }),
+      DocumentationFile.countDocuments({
+        chapter: chapter._id,
+        type: { $in: CASE_DOC_TYPES },
+        $or: [
+          { caseStatus: "pending" },
+          { caseStatus: "running" },
+          { caseStatus: { $exists: false } },
+          { caseStatus: null },
+        ],
+      }),
       Donation.aggregate([
         { $match: { chapter: chapter._id } },
         { $group: { _id: null, total: { $sum: "$amount" } } },

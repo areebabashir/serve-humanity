@@ -3,7 +3,7 @@ import Chapter from "../models/Chapter.js";
 import User, { CEO_DASHBOARD_ROLES, isFullAccessRole } from "../models/User.js";
 import mongoose from "mongoose";
 import { uploadToCloudinary } from "../middleware/upload.js";
-import { isOwnCollectionRole, isTeamHeadRole, isCabinetRole, isTeamDirectorRole, isValidTeamLeadRole, TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
+import { isOwnCollectionRole, isCabinetRole, isTeamDirectorRole, isValidTeamLeadRole, TEAM_HEAD_ROLES } from "../lib/teamHeads.js";
 import { sendEmail } from "../utils/email.js";
 
 function isCeoBoardDonor(user) {
@@ -497,15 +497,17 @@ export async function listChapterDonations(req, res, next) {
       baseFilter.donor = req.user._id;
     } else if (canViewAll(req.user)) {
       if (directorId) baseFilter.teamDirector = directorId;
-    } else if (isTeamDirectorRole(req.user.chapterRole) || isTeamHeadRole(req.user.chapterRole)) {
-      baseFilter.teamDirector = req.user._id;
     } else if (isCabinetRole(req.user.chapterRole)) {
+      // Cabinet head: donations from their directors' teams (not teamDirector = self)
       const directors = await User.find({
         chapter: cid,
         chapterRole: "director",
         cabinetMember: req.user._id,
+        isActive: { $ne: false },
       }).select("_id");
       baseFilter.teamDirector = { $in: directors.map((d) => d._id) };
+    } else if (isTeamDirectorRole(req.user.chapterRole)) {
+      baseFilter.teamDirector = req.user._id;
     } else {
       baseFilter.donor = req.user._id;
     }
@@ -540,7 +542,10 @@ export async function listChapterDonations(req, res, next) {
   }
 }
 
-/** Director only: my team collection (president/VP have own collection, not a team). */
+/**
+ * Director: members assigned to them + their donations.
+ * Cabinet head: all members in their cabinet + donations under their directors.
+ */
 export async function myTeamCollection(req, res, next) {
   try {
     const cid = chapterIdOf(req.user);
@@ -550,15 +555,74 @@ export async function myTeamCollection(req, res, next) {
         message: "Your account is not assigned to a chapter.",
       });
     }
-    if (!isTeamDirectorRole(req.user.chapterRole) && !isTeamHeadRole(req.user.chapterRole)) {
+
+    const asCabinet = isCabinetRole(req.user.chapterRole);
+    const asDirector = isTeamDirectorRole(req.user.chapterRole);
+    if (!asCabinet && !asDirector) {
       return res.status(403).json({
         success: false,
-        message: "Only directors have a team collection.",
+        message: "Only directors and cabinet heads have a team collection.",
       });
     }
 
     const period = resolvePeriod(req.query);
-    const baseFilter = { chapter: cid, teamDirector: req.user._id };
+    let baseFilter;
+    let memberQuery;
+
+    if (asCabinet) {
+      const directors = await User.find({
+        chapter: cid,
+        chapterRole: "director",
+        cabinetMember: req.user._id,
+        isActive: { $ne: false },
+      })
+        .select("_id name email phone chapterRole")
+        .sort({ name: 1 })
+        .lean();
+
+      const directorIds = directors.map((d) => d._id);
+      baseFilter = { chapter: cid, teamDirector: { $in: directorIds } };
+      memberQuery = {
+        chapter: cid,
+        chapterRole: { $in: ["member", "assistant_director"] },
+        isActive: { $ne: false },
+        membershipStatus: { $nin: ["pending", "rejected"] },
+        $or: [
+          { cabinetMember: req.user._id },
+          { requestedCabinetRole: req.user.chapterRole },
+        ],
+      };
+
+      const listFilter = applyPeriodFilter({ ...baseFilter }, period);
+      const [data, byMonth, members] = await Promise.all([
+        ChapterTeamDonation.find(listFilter)
+          .populate("donor", "name email")
+          .populate("teamDirector", "name email")
+          .populate("verifiedBy", "name email")
+          .sort({ createdAt: -1 })
+          .lean(),
+        monthHistory(baseFilter),
+        User.find(memberQuery)
+          .select("name email phone chapterRole avatar lastLogin teamDirector")
+          .populate("teamDirector", "name email")
+          .sort({ name: 1 })
+          .lean(),
+      ]);
+
+      const totals = sumByStatus(data);
+      return res.json({
+        success: true,
+        scope: "cabinet",
+        ...totals,
+        period: periodMeta(period),
+        byMonth,
+        directors,
+        members,
+        data,
+      });
+    }
+
+    baseFilter = { chapter: cid, teamDirector: req.user._id };
     const listFilter = applyPeriodFilter({ ...baseFilter }, period);
 
     const [data, byMonth, members] = await Promise.all([
@@ -583,6 +647,7 @@ export async function myTeamCollection(req, res, next) {
 
     res.json({
       success: true,
+      scope: "director",
       ...totals,
       period: periodMeta(period),
       byMonth,
@@ -643,7 +708,7 @@ export async function directorTeamTotals(req, res, next) {
       match.createdAt = { $gte: period.start, $lt: period.end };
     }
 
-    const [rows, byMonth, allMembers, unassignedMembers, bogRows] = await Promise.all([
+    const [rows, byMonth, allMembers, unassignedMembers, cabinetMembers, bogRows] = await Promise.all([
       ChapterTeamDonation.aggregate([
         { $match: { ...match, source: { $ne: "bog" } } },
         {
@@ -665,7 +730,7 @@ export async function directorTeamTotals(req, res, next) {
             .select("name email phone teamDirector")
             .sort({ name: 1 })
             .lean()
-        : [],
+        : Promise.resolve([]),
       isCabinetView
         ? User.find({
             chapter: cid,
@@ -677,7 +742,24 @@ export async function directorTeamTotals(req, res, next) {
             .select("name email phone")
             .sort({ name: 1 })
             .lean()
-        : [],
+        : Promise.resolve([]),
+      // Every general member related to this cabinet team
+      isCabinetView
+        ? User.find({
+            chapter: cid,
+            chapterRole: { $in: ["member", "assistant_director"] },
+            isActive: { $ne: false },
+            membershipStatus: { $nin: ["pending", "rejected"] },
+            $or: [
+              { cabinetMember: req.user._id },
+              { requestedCabinetRole: req.user.chapterRole },
+            ],
+          })
+            .select("name email phone teamDirector")
+            .populate("teamDirector", "name")
+            .sort({ name: 1 })
+            .lean()
+        : Promise.resolve([]),
       ChapterTeamDonation.aggregate([
         { $match: { ...match, source: "bog" } },
         {
@@ -753,6 +835,17 @@ export async function directorTeamTotals(req, res, next) {
       chapterVerifiedTotal: chapterVerified,
       chapterGrandTotal: chapterPending + chapterVerified,
       directors: byDirector,
+      cabinetMembers: isCabinetView
+        ? cabinetMembers.map((m) => ({
+            _id: m._id,
+            name: m.name,
+            email: m.email,
+            phone: m.phone,
+            teamDirector: m.teamDirector
+              ? { _id: m.teamDirector._id || m.teamDirector, name: m.teamDirector.name || null }
+              : null,
+          }))
+        : [],
       unassignedMembers: isCabinetView ? unassignedMembers : [],
       unassigned: isCabinetView
         ? {

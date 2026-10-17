@@ -123,6 +123,9 @@ const emptyForm = {
   confirmPassword: "",
   phone: "",
   chapterRole: "operations_head" as ChapterRole,
+  /** Cabinet create: director or general member */
+  accountType: "member" as "director" | "member",
+  teamDirector: "none",
 };
 
 export default function ChapterTeamPage() {
@@ -287,16 +290,30 @@ export default function ChapterTeamPage() {
     setSaving(true);
     try {
       if (isCabinet && !canAssign) {
-        await api("/users/team-directors", {
-          method: "POST",
-          body: JSON.stringify({
-            name: form.name.trim(),
-            email: form.email.trim(),
-            password: form.password,
-            phone: form.phone.trim() || undefined,
-          }),
-        });
-        toast.success("Director account created — share the email and password with them");
+        if (form.accountType === "member") {
+          await api("/users/team-members", {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.name.trim(),
+              email: form.email.trim(),
+              password: form.password,
+              phone: form.phone.trim() || undefined,
+              teamDirector: form.teamDirector === "none" ? null : form.teamDirector,
+            }),
+          });
+          toast.success("Member created — share the email and password with them");
+        } else {
+          await api("/users/team-directors", {
+            method: "POST",
+            body: JSON.stringify({
+              name: form.name.trim(),
+              email: form.email.trim(),
+              password: form.password,
+              phone: form.phone.trim() || undefined,
+            }),
+          });
+          toast.success("Director account created — share the email and password with them");
+        }
       } else {
         await api("/users/chapter-directors", {
           method: "POST",
@@ -321,7 +338,19 @@ export default function ChapterTeamPage() {
   }
 
   const canCreate = canAssign ? availableRoles.length > 0 : isCabinet;
-  const createLabel = canAssign ? "Add VP / cabinet" : "Add director";
+  const createLabel = canAssign
+    ? "Add VP / cabinet"
+    : form.accountType === "director"
+      ? "Add director"
+      : "Add member";
+
+  const generalMembers = useMemo(
+    () =>
+      rows.filter(
+        (u) => u.chapterRole === "member" || u.chapterRole === "assistant_director",
+      ),
+    [rows],
+  );
 
   return (
     <div>
@@ -331,7 +360,7 @@ export default function ChapterTeamPage() {
           canAssign
             ? "Approve join requests and create Vice Presidents / cabinet seats. Members are verified into a team on join — cabinet heads assign them to directors."
             : isCabinet
-              ? "Approve join requests for your team, add directors, then assign your members to a director (shown as Documentation Director, etc.)."
+              ? "See all general members for your team, add members or directors, then assign each member to a director."
               : "Chapter login accounts and their roles."
         }
         actions={
@@ -340,29 +369,61 @@ export default function ChapterTeamPage() {
               open={open}
               onOpenChange={(v) => {
                 setOpen(v);
-                if (v && availableRoles[0]) {
-                  setForm((f) => ({ ...f, chapterRole: availableRoles[0] }));
+                if (v) {
+                  setForm((f) => ({
+                    ...emptyForm,
+                    chapterRole: availableRoles[0] || f.chapterRole,
+                    accountType: isCabinet && !canAssign ? "member" : f.accountType,
+                  }));
                 }
               }}
             >
               <DialogTrigger asChild>
                 <Button>
                   <UserPlus className="h-4 w-4" />
-                  {createLabel}
+                  {isCabinet && !canAssign ? "Add member / director" : createLabel}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md sm:rounded-2xl">
                 <DialogHeader>
                   <DialogTitle>
-                    {canAssign ? "Add VP or cabinet member" : "Add director"}
+                    {canAssign
+                      ? "Add VP or cabinet member"
+                      : form.accountType === "director"
+                        ? "Add director"
+                        : "Add general member"}
                   </DialogTitle>
                   <DialogDescription>
                     {canAssign
                       ? "Creates a chapter login. One active seat per cabinet role."
-                      : "Creates a director under your cabinet. Share the email and password with them."}
+                      : form.accountType === "director"
+                        ? "Creates a director under your cabinet. Share the email and password with them."
+                        : "Creates a general member on your team. You can assign them to a director now or later."}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onCreate} className="space-y-3">
+                  {isCabinet && !canAssign ? (
+                    <div>
+                      <Label>Account type</Label>
+                      <Select
+                        value={form.accountType}
+                        onValueChange={(v) =>
+                          setForm((f) => ({
+                            ...f,
+                            accountType: v as "director" | "member",
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">General member</SelectItem>
+                          <SelectItem value="director">Director</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                   <div>
                     <Label htmlFor="dir-name">Full name</Label>
                     <Input
@@ -406,6 +467,27 @@ export default function ChapterTeamPage() {
                           {availableRoles.map((r) => (
                             <SelectItem key={r} value={r}>
                               {CHAPTER_ROLE_LABEL[r]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                  {isCabinet && !canAssign && form.accountType === "member" ? (
+                    <div>
+                      <Label>Assign director (optional)</Label>
+                      <Select
+                        value={form.teamDirector}
+                        onValueChange={(v) => setForm((f) => ({ ...f, teamDirector: v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Unassigned" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Unassigned</SelectItem>
+                          {myDirectors.map((d) => (
+                            <SelectItem key={d._id} value={d._id}>
+                              {directorDisplayName(d, me?.chapterRole)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -528,6 +610,20 @@ export default function ChapterTeamPage() {
         </ChapterCard>
       ) : null}
 
+      {isCabinet && !canAssign ? (
+        <ChapterCard className="mb-4">
+          <p className="text-sm font-semibold">
+            Your team · {generalMembers.length} general member
+            {generalMembers.length === 1 ? "" : "s"} · {myDirectors.length} director
+            {myDirectors.length === 1 ? "" : "s"}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use the Director column on each general member to assign them. Or click{" "}
+            <span className="font-medium">Add member / director</span> to create a new account.
+          </p>
+        </ChapterCard>
+      ) : null}
+
       <ChapterCard className="overflow-x-auto p-0 md:p-0">
         <Table>
           <TableHeader>
@@ -535,7 +631,6 @@ export default function ChapterTeamPage() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Cabinet</TableHead>
               <TableHead>Director</TableHead>
               {canDeleteAccounts ? <TableHead className="text-right">Actions</TableHead> : null}
             </TableRow>
@@ -543,13 +638,13 @@ export default function ChapterTeamPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={canDeleteAccounts ? 6 : 5} className="text-muted-foreground">
+                <TableCell colSpan={canDeleteAccounts ? 5 : 4} className="text-muted-foreground">
                   <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canDeleteAccounts ? 6 : 5} className="text-muted-foreground">
+                <TableCell colSpan={canDeleteAccounts ? 5 : 4} className="text-muted-foreground">
                   No users found for this chapter.
                 </TableCell>
               </TableRow>
@@ -563,9 +658,12 @@ export default function ChapterTeamPage() {
                 const canEditRole = canAssign && !isSelf && !isTargetPresident;
                 const isMember =
                   u.chapterRole === "member" || u.chapterRole === "assistant_director";
-                // President / VPs do not assign members — cabinet verifies join, then assigns directors
+                // President / VPs do not assign members — cabinet assigns directors to general members
                 const inMyCabinet = idOfRef(u.cabinetMember) === me?._id;
-                const canEditDirector = isCabinet && !canAssign && isMember && inMyCabinet;
+                const relatedToMyTeam =
+                  inMyCabinet || u.requestedCabinetRole === me?.chapterRole;
+                const canEditDirector =
+                  isCabinet && !canAssign && isMember && relatedToMyTeam;
                 const current = (u.chapterRole as ChapterRole) || "member";
                 const selectValue = CABINET_ASSIGNABLE_ROLES.includes(current)
                   ? current
@@ -612,45 +710,34 @@ export default function ChapterTeamPage() {
                     </TableCell>
                     <TableCell>
                       {ownCollectionOnly || isCabinetRole(u.chapterRole) ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : isTeamDirectorRole(u.chapterRole) ? (
-                        <span className="text-xs text-muted-foreground">
-                          {typeof u.cabinetMember === "object" && u.cabinetMember?.name
-                            ? `${u.cabinetMember.name} · ${roleLabel(u.cabinetMember.chapterRole)}`
-                            : "Your cabinet"}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {typeof u.cabinetMember === "object" && u.cabinetMember?.name
-                            ? `${u.cabinetMember.name} · ${teamNameFromCabinetRole(u.cabinetMember.chapterRole)}`
-                            : "Unassigned"}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {ownCollectionOnly || isCabinetRole(u.chapterRole) ? (
                         <span className="text-xs text-muted-foreground">Own collection</span>
                       ) : isTeamDirectorRole(u.chapterRole) ? (
                         <span className="text-xs font-medium text-foreground">
                           {memberRoleDisplay(u)}
                         </span>
                       ) : canEditDirector ? (
-                        <Select
-                          value={refId(u, "teamDirector")}
-                          onValueChange={(v) => void changeDirector(u._id, v)}
-                        >
-                          <SelectTrigger className="w-[260px]">
-                            <SelectValue placeholder="Assign director" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Unassigned</SelectItem>
-                            {myDirectors.map((d) => (
-                              <SelectItem key={d._id} value={d._id}>
-                                {directorDisplayName(d, me?.chapterRole)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        myDirectors.length === 0 ? (
+                          <span className="text-xs text-amber-700 dark:text-amber-400">
+                            Add a director first, then assign
+                          </span>
+                        ) : (
+                          <Select
+                            value={refId(u, "teamDirector")}
+                            onValueChange={(v) => void changeDirector(u._id, v)}
+                          >
+                            <SelectTrigger className="w-[260px]">
+                              <SelectValue placeholder="Assign director" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Unassigned</SelectItem>
+                              {myDirectors.map((d) => (
+                                <SelectItem key={d._id} value={d._id}>
+                                  {directorDisplayName(d, me?.chapterRole)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )
                       ) : (
                         <span className="text-xs text-muted-foreground">
                           {typeof u.teamDirector === "object" && u.teamDirector?.name

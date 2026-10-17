@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ChapterCard, ChapterPageHeader } from "@/components/chapter/ChapterPage";
@@ -13,19 +13,38 @@ export default function ChapterProfilePage() {
   const { user, refresh } = useAuth();
   const role = resolveChapterRole(user ?? {});
   const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [saving, setSaving] = useState(false);
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwSaving, setPwSaving] = useState(false);
 
+  useEffect(() => {
+    setName(user?.name || "");
+    setEmail(user?.email || "");
+    setPhone(user?.phone || "");
+  }, [user?.name, user?.email, user?.phone]);
+
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
     if (!user) return;
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
     setSaving(true);
     try {
       await api(`/users/${user._id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name, phone }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+        }),
       });
       await refresh();
       toast.success("Profile updated");
@@ -73,10 +92,6 @@ export default function ChapterProfilePage() {
           <h3 className="mb-4 text-sm font-semibold">Account</h3>
           <dl className="mb-4 space-y-2 text-sm">
             <div className="flex justify-between gap-3">
-              <dt className="text-muted-foreground">Email</dt>
-              <dd>{user?.email}</dd>
-            </div>
-            <div className="flex justify-between gap-3">
               <dt className="text-muted-foreground">Role</dt>
               <dd>{CHAPTER_ROLE_LABEL[role]}</dd>
             </div>
@@ -87,12 +102,35 @@ export default function ChapterProfilePage() {
           </dl>
           <form onSubmit={saveProfile} className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <Label htmlFor="profile-name">Name</Label>
+              <Input
+                id="profile-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
             </div>
             <div className="space-y-1.5">
-              <Label>Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <Label htmlFor="profile-email">Email (login)</Label>
+              <Input
+                id="profile-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                This is your login email. It must be unique.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="profile-phone">Phone</Label>
+              <Input
+                id="profile-phone"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
             </div>
             <Button type="submit" disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save profile"}

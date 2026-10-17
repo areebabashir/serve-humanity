@@ -37,6 +37,14 @@ function canAccessDocs(user) {
   return belongsToTeamModule(user, DOC_MODULE);
 }
 
+/** Drive upload: BOG / CEO, chapter president, VPs, or Documentation cabinet head only. */
+function canUploadDocsToDrive(user) {
+  if (!user) return false;
+  if (DOC_BOG.has(user.systemRole) || isBogUser(user)) return true;
+  if (isChapterLeadership(user)) return true;
+  return isCabinetForModule(user, DOC_MODULE);
+}
+
 function populateDocQuery(q) {
   return q
     .populate("chapter", "name city")
@@ -312,16 +320,20 @@ export async function uploadDocAttachment(req, res, next) {
 
     const result = await uploadToCloudinary(req.file, "serve-humanity/documentation");
 
-    const drive = await uploadDocumentationToDrive({
-      buffer: req.file.buffer,
-      mimeType: req.file.mimetype,
-      originalName: req.file.originalname,
-      docType,
-      chapterName,
-      caseNumber,
-      beneficiaryName,
-      attachmentKey,
-    });
+    // Only president / VPs / Documentation cabinet head / BOG sync attachments to Drive
+    let drive = null;
+    if (canUploadDocsToDrive(req.user)) {
+      drive = await uploadDocumentationToDrive({
+        buffer: req.file.buffer,
+        mimeType: req.file.mimetype,
+        originalName: req.file.originalname,
+        docType,
+        chapterName,
+        caseNumber,
+        beneficiaryName,
+        attachmentKey,
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -333,7 +345,7 @@ export async function uploadDocAttachment(req, res, next) {
         driveWebViewLink: drive?.driveWebViewLink || "",
         drivePath: drive?.drivePath || "",
         driveSynced: Boolean(drive?.driveFileId),
-        driveEnabled: googleDriveConfigured(),
+        driveEnabled: googleDriveConfigured() && canUploadDocsToDrive(req.user),
       },
     });
   } catch (err) {
@@ -344,6 +356,14 @@ export async function uploadDocAttachment(req, res, next) {
 /** Upload a filled-form PDF to Google Drive (no duplicates per document) */
 export async function uploadDocPdf(req, res, next) {
   try {
+    if (!canUploadDocsToDrive(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Only the president, vice presidents, or Documentation cabinet head can upload documents to Google Drive.",
+      });
+    }
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No PDF uploaded." });
     }
@@ -364,6 +384,7 @@ export async function uploadDocPdf(req, res, next) {
       if (
         existing &&
         !isCabinetForModule(req.user, DOC_MODULE) &&
+        !isChapterLeadership(req.user) &&
         !isBogUser(req.user) &&
         existing.approvalStatus !== "approved"
       ) {

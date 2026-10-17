@@ -14,6 +14,7 @@ import {
   createBogAccount,
   createChapterDirector,
   createTeamDirector,
+  createTeamMember,
   listChapterMembersForCeo,
   getChapterMemberDetailForCeo,
   listJoinRequests,
@@ -106,6 +107,20 @@ router.post(
     ],
   }),
   createTeamDirector,
+);
+
+router.post(
+  "/team-members",
+  requireSystemOrChapter({
+    chapter: [
+      "finance_head",
+      "operations_head",
+      "verification_head",
+      "documentation_head",
+      "media_head",
+    ],
+  }),
+  createTeamMember,
 );
 
 router.get(

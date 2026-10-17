@@ -251,7 +251,9 @@ export function ChapterSidebar() {
                   <item.icon className="h-4 w-4" />
                   {item.module === "director-donations" && isCabinetRole(role)
                     ? "Cabinet donations"
-                    : item.title}
+                    : item.module === "team-collection" && isCabinetRole(role)
+                      ? "My team members"
+                      : item.title}
                 </NavLink>
               ))}
             </div>

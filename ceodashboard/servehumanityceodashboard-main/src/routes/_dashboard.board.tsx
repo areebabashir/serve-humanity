@@ -76,7 +76,7 @@ const emptyForm = {
   systemRole: "bog_verification" as OrgRole,
 };
 
-/** Founder may delete CEO / CTO / COO; anyone with manage access may delete BOG seats. */
+/** Full-access may delete any BOG seat. Founder may also delete CEO / CTO / COO / other Founders. */
 function canDeleteMember(
   actorRole: OrgRole | undefined,
   target: BoardUser,
@@ -84,11 +84,8 @@ function canDeleteMember(
 ) {
   if (!actorRole || !isFullAccessRole(actorRole)) return false;
   if (selfId && target._id === selfId) return false;
-  if (!isFullAccessRole(target.systemRole)) return true;
-  return (
-    actorRole === "founder" &&
-    (["ceo", "cto", "coo"] as OrgRole[]).includes(target.systemRole)
-  );
+  if (!isFullAccessRole(target.systemRole)) return true; // any BOG
+  return actorRole === "founder";
 }
 
 function BoardPage() {
@@ -428,6 +425,8 @@ function BoardPage() {
             <AlertDialogTitle>Delete account?</AlertDialogTitle>
             <AlertDialogDescription>
               This permanently removes their login. They will no longer access the CEO dashboard.
+              BOG seats can be recreated afterward; full-access seats can only be removed by the
+              Founder.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

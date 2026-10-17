@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth";
 import {
   canAccessChapterModule,
   CHAPTER_ROLE_LABEL,
+  isCabinetRole,
   resolveChapterRole,
 } from "@/lib/chapterRoles";
 import { ChapterCard, ChapterPageHeader } from "@/components/chapter/ChapterPage";
@@ -128,6 +129,7 @@ export default function ChapterOverviewPage() {
   const { user } = useAuth();
   const role = resolveChapterRole(user ?? {});
   const first = user?.name?.split(" ")[0] || "there";
+  const cabinet = isCabinetRole(role);
   const links = SHORTCUTS.filter((s) => canAccessChapterModule(role, s.module));
 
   return (
@@ -138,7 +140,20 @@ export default function ChapterOverviewPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {links.map((item) => (
+        {links.map((item) => {
+          const title =
+            cabinet && item.module === "team-collection"
+              ? "My team members"
+              : cabinet && item.module === "director-donations"
+                ? "Cabinet donations"
+                : item.title;
+          const blurb =
+            cabinet && item.module === "team-collection"
+              ? "Members linked to your cabinet"
+              : cabinet && item.module === "director-donations"
+                ? "Your directors, members & donations"
+                : item.blurb;
+          return (
           <Link
             key={item.to}
             to={item.to}
@@ -150,10 +165,11 @@ export default function ChapterOverviewPage() {
               </div>
               <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-brand-orange" />
             </div>
-            <h2 className="mt-4 font-display text-lg font-semibold">{item.title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{item.blurb}</p>
+            <h2 className="mt-4 font-display text-lg font-semibold">{title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{blurb}</p>
           </Link>
-        ))}
+          );
+        })}
       </div>
 
       {links.length === 0 ? (

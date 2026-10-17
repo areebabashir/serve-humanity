@@ -28,6 +28,7 @@ export const Route = createFileRoute("/_dashboard/settings")({
 function SettingsPage() {
   const { user, refresh } = useAuth();
   const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState(user?.phone || "");
   const [saving, setSaving] = useState(false);
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
@@ -35,8 +36,9 @@ function SettingsPage() {
 
   useEffect(() => {
     setName(user?.name || "");
+    setEmail(user?.email || "");
     setPhone(user?.phone || "");
-  }, [user?.name, user?.phone]);
+  }, [user?.name, user?.email, user?.phone]);
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
@@ -45,11 +47,19 @@ function SettingsPage() {
       toast.error("Name is required");
       return;
     }
+    if (!email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
     setSaving(true);
     try {
       await api(`/users/${user._id}`, {
         method: "PATCH",
-        body: JSON.stringify({ name: name.trim(), phone: phone.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+        }),
       });
       await refresh();
       toast.success("Profile updated");
@@ -127,10 +137,6 @@ function SettingsPage() {
               </div>
               <dl className="mb-5 space-y-2.5 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Email</dt>
-                  <dd className="font-medium">{user?.email || "—"}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">Role</dt>
                   <dd>
                     <Badge variant={isFullAccessRole(user?.systemRole) ? "default" : "secondary"}>
@@ -164,6 +170,21 @@ function SettingsPage() {
                     placeholder="Your name"
                     required
                   />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="settings-email">Email (login)</Label>
+                  <Input
+                    id="settings-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@servehumanity.org"
+                    autoComplete="email"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This is your login email. Use a unique address not already on another account.
+                  </p>
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="settings-phone">Phone</Label>

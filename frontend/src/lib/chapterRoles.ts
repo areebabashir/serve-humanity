@@ -143,9 +143,9 @@ const LEADERSHIP_MODULES = [
   "profile",
 ] as const;
 
-const CABINET_BASE = ["overview", "team", "notifications", "profile"] as const;
+const CABINET_BASE = ["overview", "team", "team-collection", "notifications", "profile"] as const;
 
-/** Modules a role can open (read). Directors get team-collection. */
+/** Modules a role can open (read). Directors + cabinet heads get team-collection. */
 export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
   president: [...LEADERSHIP_MODULES],
   vice_president: [...LEADERSHIP_MODULES],
@@ -174,11 +174,11 @@ export const CHAPTER_WRITE: Record<ChapterRole, string[]> = {
   vice_president: [...LEADERSHIP_MODULES],
   vice_president_male: [...LEADERSHIP_MODULES],
   director: ["team-collection"],
-  finance_head: ["team", "finance", "director-donations"],
-  operations_head: ["team", "operations", "ops"],
-  verification_head: ["team", "verification", "ops", "case-registrations"],
-  documentation_head: ["team", "documentation", "case-registrations"],
-  media_head: ["team", "media"],
+  finance_head: ["team", "team-collection", "finance", "director-donations"],
+  operations_head: ["team", "team-collection", "operations", "ops", "director-donations"],
+  verification_head: ["team", "team-collection", "verification", "ops", "case-registrations", "director-donations"],
+  documentation_head: ["team", "team-collection", "documentation", "case-registrations", "director-donations"],
+  media_head: ["team", "team-collection", "media", "director-donations"],
   it_head: ["my-donation"],
   hr_head: ["my-donation"],
   fundraising_head: ["my-donation"],
@@ -296,6 +296,27 @@ export function canWriteChapterModule(role: ChapterRole, module: string): boolea
 
 export function isChapterLeadership(role: ChapterRole): boolean {
   return role === "president" || isVicePresidentRole(role) || isCabinetRole(role);
+}
+
+/** Chapter Drive upload for documentation: president, VPs, or Documentation cabinet head. */
+export function canUploadDocumentationToDrive(user: {
+  systemRole?: string;
+  chapterRole?: string | null;
+} | null | undefined): boolean {
+  if (!user) return false;
+  const sys = user.systemRole || "";
+  if (
+    sys === "ceo" ||
+    sys === "founder" ||
+    sys === "cto" ||
+    sys === "coo" ||
+    sys === "bog_documentation" ||
+    sys === "president"
+  ) {
+    return true;
+  }
+  if (user.chapterRole === "president" || isVicePresidentRole(user.chapterRole)) return true;
+  return user.chapterRole === "documentation_head";
 }
 
 export function isChapterAppUser(systemRole: string | undefined | null): boolean {

@@ -23,6 +23,7 @@ type TeamMember = {
   name: string;
   email?: string;
   phone?: string;
+  teamDirector?: { _id?: string; name?: string | null } | null;
 };
 
 type DirectorTotal = {
@@ -58,6 +59,7 @@ export default function DirectorDonationsPage() {
   const [loading, setLoading] = useState(true);
   const [directors, setDirectors] = useState<DirectorTotal[]>([]);
   const [unassignedMembers, setUnassignedMembers] = useState<TeamMember[]>([]);
+  const [cabinetMembers, setCabinetMembers] = useState<TeamMember[]>([]);
   const [unassigned, setUnassigned] = useState({ pendingTotal: 0, verifiedTotal: 0, grandTotal: 0 });
   const [chapterPending, setChapterPending] = useState(0);
   const [chapterVerified, setChapterVerified] = useState(0);
@@ -79,6 +81,7 @@ export default function DirectorDonationsPage() {
           scope?: "cabinet" | "chapter";
           directors: DirectorTotal[];
           unassignedMembers?: TeamMember[];
+          cabinetMembers?: TeamMember[];
           unassigned: { pendingTotal: number; verifiedTotal: number; grandTotal: number };
           chapterPendingTotal: number;
           chapterVerifiedTotal: number;
@@ -92,6 +95,7 @@ export default function DirectorDonationsPage() {
       ]);
       setDirectors(totals.directors || []);
       setUnassignedMembers(totals.unassignedMembers || []);
+      setCabinetMembers(totals.cabinetMembers || []);
       setUnassigned(totals.unassigned || { pendingTotal: 0, verifiedTotal: 0, grandTotal: 0 });
       setChapterPending(totals.chapterPendingTotal || 0);
       setChapterVerified(totals.chapterVerifiedTotal || 0);
@@ -209,6 +213,53 @@ export default function DirectorDonationsPage() {
         {isCabinet ? (
           <TabsContent value="teams">
             <div className="space-y-4">
+              <ChapterCard className="overflow-x-auto p-0 md:p-0">
+                <div className="border-b border-border px-4 py-3">
+                  <h3 className="text-sm font-semibold">
+                    All members in your cabinet ({cabinetMembers.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Same as your team view — only members linked to this cabinet head
+                  </p>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Director</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-muted-foreground">
+                          <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…
+                        </TableCell>
+                      </TableRow>
+                    ) : cabinetMembers.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-muted-foreground">
+                          No members in your cabinet yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      cabinetMembers.map((m) => (
+                        <TableRow key={m._id}>
+                          <TableCell className="font-medium">{m.name}</TableCell>
+                          <TableCell>{m.email || "—"}</TableCell>
+                          <TableCell>{m.phone || "—"}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {m.teamDirector?.name || "Unassigned"}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </ChapterCard>
+
               {loading ? (
                 <ChapterCard className="text-muted-foreground">
                   <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading…

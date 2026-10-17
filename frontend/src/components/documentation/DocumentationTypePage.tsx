@@ -39,6 +39,7 @@ import {
 } from "@/lib/documentation";
 import { buildDocumentationPdf, downloadDocumentationPdf } from "@/lib/documentation-pdf";
 import { useAuth } from "@/lib/auth";
+import { canUploadDocumentationToDrive } from "@/lib/chapterRoles";
 import type { ChapterScope } from "@/components/finance/FinanceDonationPage";
 
 export interface DocAttachment {
@@ -174,6 +175,7 @@ export function DocumentationTypePage({
   const schema = DOC_FIELD_SCHEMAS[type];
   const { user } = useAuth();
   const isScoped = Boolean(scope);
+  const canDriveUpload = canUploadDocumentationToDrive(user);
   const [rows, setRows] = useState<DocRecord[]>([]);
   const [chapters, setChapters] = useState<ChapterOption[]>([]);
   const [chapterFilter, setChapterFilter] = useState<string>("all");
@@ -618,37 +620,39 @@ export function DocumentationTypePage({
                         <FileDown className="h-3.5 w-3.5" />
                       )}
                     </Button>
-                    {r.pdfDriveFileId ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        title="On Google Drive — open"
-                        className="border-emerald-600/40 text-emerald-700"
-                        onClick={() => {
-                          if (r.pdfDriveWebViewLink) {
-                            window.open(r.pdfDriveWebViewLink, "_blank", "noopener,noreferrer");
-                          } else {
-                            toast.message("Already uploaded to Google Drive");
-                          }
-                        }}
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        title="Upload PDF to Google Drive"
-                        disabled={driveBusy === r._id}
-                        onClick={() => void handleUploadPdfToDrive(r)}
-                      >
-                        {driveBusy === r._id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <CloudUpload className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                    )}
+                    {canDriveUpload ? (
+                      r.pdfDriveFileId ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="On Google Drive — open"
+                          className="border-emerald-600/40 text-emerald-700"
+                          onClick={() => {
+                            if (r.pdfDriveWebViewLink) {
+                              window.open(r.pdfDriveWebViewLink, "_blank", "noopener,noreferrer");
+                            } else {
+                              toast.message("Already uploaded to Google Drive");
+                            }
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Upload PDF to Google Drive"
+                          disabled={driveBusy === r._id}
+                          onClick={() => void handleUploadPdfToDrive(r)}
+                        >
+                          {driveBusy === r._id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <CloudUpload className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      )
+                    ) : null}
                     <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>

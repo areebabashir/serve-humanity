@@ -84,14 +84,18 @@ type TeamUser = {
   cabinetMember?: { _id?: string; name?: string; chapterRole?: string } | null;
 };
 
-type MemberRow = {
+type CaseRow = {
   _id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  role?: string;
+  type?: string;
+  title?: string;
+  caseNumber?: string;
+  caseStatus?: string;
+  approvalStatus?: string;
   status?: string;
-  joinedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  fields?: Record<string, unknown>;
+  createdBy?: { name?: string; email?: string; chapterRole?: string } | null;
 };
 
 type MonthDonation = {
@@ -117,8 +121,9 @@ type ChapterDetails = {
   chapter: ChapterRow;
   president: ChapterPresident;
   team: TeamUser[];
-  members: MemberRow[];
+  cases?: CaseRow[];
   activeCases: number;
+  casesClosed?: number;
   donationTotals: {
     pending: number;
     verified: number;
@@ -130,6 +135,17 @@ type ChapterDetails = {
   publicDonationsByMonth: MonthDonation[];
   recentTeamDonations: RecentDonation[];
 };
+
+function caseTypeLabel(type?: string) {
+  if (!type) return "—";
+  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function beneficiaryFromCase(c: CaseRow) {
+  const f = c.fields || {};
+  const name = f.beneficiaryName || f.patientName || f.applicantName || f.name;
+  return typeof name === "string" && name.trim() ? name.trim() : "—";
+}
 
 function fmtPKR(n: number) {
   return new Intl.NumberFormat("en-PK", {
@@ -654,7 +670,7 @@ function ChaptersPage() {
           <SheetHeader>
             <SheetTitle>{chapter?.name || "Chapter details"}</SheetTitle>
             <SheetDescription>
-              {chapter ? `${chapter.city} · Full profile, donations, team & contacts` : "Loading chapter profile…"}
+              {chapter ? `${chapter.city} · Full profile, donations, team & cases` : "Loading chapter profile…"}
             </SheetDescription>
           </SheetHeader>
 
@@ -690,6 +706,9 @@ function ChaptersPage() {
                 <div className="rounded-lg border border-border p-3">
                   <p className="text-xs text-muted-foreground">Active cases</p>
                   <p className="mt-1 text-lg font-semibold">{details.activeCases}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Pending + running · {details.casesClosed ?? chapter.casesClosed ?? 0} complete
+                  </p>
                 </div>
               </div>
 
@@ -699,7 +718,7 @@ function ChaptersPage() {
                   <TabsTrigger value="president">President</TabsTrigger>
                   <TabsTrigger value="donations">Donations</TabsTrigger>
                   <TabsTrigger value="team">Team</TabsTrigger>
-                  <TabsTrigger value="members">Members</TabsTrigger>
+                  <TabsTrigger value="cases">Cases</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-4 space-y-3">
@@ -759,11 +778,11 @@ function ChaptersPage() {
                         </TableRow>
                         <TableRow>
                           <TableCell className="text-muted-foreground">Member count</TableCell>
-                          <TableCell>{chapter.memberCount ?? details.members.length}</TableCell>
+                          <TableCell>{details.team.length}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="text-muted-foreground">Cases closed</TableCell>
-                          <TableCell>{chapter.casesClosed ?? 0}</TableCell>
+                          <TableCell>{details.casesClosed ?? chapter.casesClosed ?? 0}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="text-muted-foreground">Total events</TableCell>
@@ -1011,7 +1030,11 @@ function ChaptersPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="team" className="mt-4">
+                <TabsContent value="team" className="mt-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    All chapter login accounts — president, VPs, cabinet, directors, and general members (
+                    {details.team.length}).
+                  </p>
                   <div className="rounded-xl border border-border">
                     <Table>
                       <TableHeader>
@@ -1114,36 +1137,52 @@ function ChaptersPage() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="members" className="mt-4">
+                <TabsContent value="cases" className="mt-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    All documentation cases for this chapter (health, marriage, fee, ration). Active:{" "}
+                    {details.activeCases} · Complete: {details.casesClosed ?? 0}.
+                  </p>
                   <div className="rounded-xl border border-border">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Role</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Title / beneficiary</TableHead>
+                          <TableHead>Case #</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Joined</TableHead>
+                          <TableHead>Created by</TableHead>
+                          <TableHead>Updated</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {details.members.length === 0 ? (
+                        {(details.cases || []).length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-muted-foreground">
-                              No member roster entries.
+                            <TableCell colSpan={6} className="text-muted-foreground">
+                              No cases for this chapter yet.
                             </TableCell>
                           </TableRow>
                         ) : (
-                          details.members.map((m) => (
-                            <TableRow key={m._id}>
-                              <TableCell className="font-medium">{m.name}</TableCell>
+                          (details.cases || []).map((c) => (
+                            <TableRow key={c._id}>
                               <TableCell>
-                                <div className="text-sm">{m.email || "—"}</div>
-                                <div className="text-xs text-muted-foreground">{m.phone || "No phone"}</div>
+                                <Badge variant="secondary">{caseTypeLabel(c.type)}</Badge>
                               </TableCell>
-                              <TableCell>{roleLabel(m.role)}</TableCell>
-                              <TableCell className="capitalize">{m.status || "—"}</TableCell>
-                              <TableCell>{formatDate(m.joinedAt)}</TableCell>
+                              <TableCell className="font-medium">
+                                <div>{c.title || beneficiaryFromCase(c)}</div>
+                                {c.title && beneficiaryFromCase(c) !== "—" ? (
+                                  <div className="text-xs text-muted-foreground">{beneficiaryFromCase(c)}</div>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="text-sm">{c.caseNumber || "—"}</TableCell>
+                              <TableCell className="capitalize">
+                                {c.caseStatus || "pending"}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {c.createdBy?.name || "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {formatDate(c.updatedAt || c.createdAt)}
+                              </TableCell>
                             </TableRow>
                           ))
                         )}

@@ -89,6 +89,34 @@ function refId(ref) {
   return ref._id || ref;
 }
 
+/** Member belongs to this cabinet, or requested this team's seat (general member). */
+function canCabinetManageMember(cabinetUser, target) {
+  if (!cabinetUser || !target) return false;
+  if (target.chapterRole !== "member" && target.chapterRole !== "assistant_director") {
+    return false;
+  }
+  if (target.membershipStatus === "pending" || target.membershipStatus === "rejected") {
+    return false;
+  }
+  if (String(refId(target.cabinetMember)) === String(cabinetUser._id)) return true;
+  // Team-related general members (even if linked to another/old cabinet seat)
+  return target.requestedCabinetRole === cabinetUser.chapterRole;
+}
+
+async function claimOrphanedMembersForCabinet(chapterId, cabinetRole, cabinetUserId) {
+  if (!chapterId || !cabinetRole || !cabinetUserId || !isCabinetRole(cabinetRole)) return;
+  await User.updateMany(
+    {
+      chapter: chapterId,
+      chapterRole: { $in: ["member", "assistant_director"] },
+      requestedCabinetRole: cabinetRole,
+      membershipStatus: { $nin: ["pending", "rejected"] },
+      $or: [{ cabinetMember: null }, { cabinetMember: { $exists: false } }],
+    },
+    { $set: { cabinetMember: cabinetUserId } },
+  );
+}
+
 /** CEO dashboard board: full-access leaders + BOG accounts */
 export async function getBoardMembers(req, res, next) {
   try {
@@ -182,6 +210,11 @@ export async function createChapterDirector(req, res, next) {
 
     await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
 
+    // Link approved members who requested this cabinet seat but had no head yet
+    if (isCabinetRole(chapterRole)) {
+      await claimOrphanedMembersForCabinet(chapterId, chapterRole, user._id);
+    }
+
     const safe = await User.findById(user._id)
       .select("-password")
       .populate("chapter", "name city");
@@ -257,6 +290,91 @@ export async function createTeamDirector(req, res, next) {
   }
 }
 
+/**
+ * Cabinet member creates a general member under their cabinet.
+ * POST /users/team-members
+ */
+export async function createTeamMember(req, res, next) {
+  try {
+    if (!isCabinetUser(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only cabinet members can create general members for their team.",
+      });
+    }
+
+    const chapterId = chapterIdOf(req.user);
+    if (!chapterId) {
+      return res.status(400).json({
+        success: false,
+        message: "Your account is not linked to a chapter.",
+      });
+    }
+
+    const { name, email, password, phone, teamDirector } = req.body || {};
+    if (!name?.trim() || !email?.trim() || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password are required.",
+      });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    const exists = await User.findOne({ email: String(email).toLowerCase().trim() });
+    if (exists) {
+      return res.status(409).json({ success: false, message: "Email already registered." });
+    }
+
+    let directorId = null;
+    if (teamDirector && teamDirector !== "none") {
+      const director = await User.findById(teamDirector);
+      if (
+        !director ||
+        director.chapterRole !== "director" ||
+        String(refId(director.cabinetMember)) !== String(req.user._id) ||
+        String(director.chapter) !== String(chapterId)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Pick a director from your own cabinet team.",
+        });
+      }
+      directorId = director._id;
+    }
+
+    const user = await User.create({
+      name: name.trim(),
+      email: String(email).toLowerCase().trim(),
+      password,
+      phone: phone?.trim() || "",
+      systemRole: "member",
+      chapterRole: "member",
+      chapter: chapterId,
+      cabinetMember: req.user._id,
+      teamDirector: directorId,
+      requestedCabinetRole: req.user.chapterRole,
+      isActive: true,
+      membershipStatus: "approved",
+    });
+
+    await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
+
+    const safe = await User.findById(user._id)
+      .select("-password")
+      .populate("chapter", "name city")
+      .populate("cabinetMember", "name email chapterRole")
+      .populate("teamDirector", "name email chapterRole");
+    res.status(201).json({ success: true, data: safe });
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** Leadership creates Founder / CTO / COO / BOG login */
 export async function createBogAccount(req, res, next) {
   try {
@@ -326,9 +444,18 @@ export async function getAllUsers(req, res, next) {
       if (cid) filter.chapter = cid;
       else filter.chapter = null;
       if (isCabinetUser(req.user) && !canAssignRoles(req.user)) {
+        // Attach unlinked members who requested this team
+        await claimOrphanedMembersForCabinet(cid, req.user.chapterRole, req.user._id);
+        // Self + directors/members already under this cabinet + all general members
+        // who requested this team's seat (so cabinet can assign a director)
         filter.$or = [
           { cabinetMember: req.user._id },
           { _id: req.user._id },
+          {
+            chapterRole: { $in: ["member", "assistant_director"] },
+            requestedCabinetRole: req.user.chapterRole,
+            membershipStatus: { $nin: ["pending", "rejected"] },
+          },
         ];
       }
     }
@@ -439,10 +566,20 @@ export async function approveJoinRequest(req, res, next) {
         }).select("_id")
       : null;
 
+    // Prefer approving cabinet head, then active seat for that team, then prior cabinet sign-off
+    let cabinetMemberId = null;
+    if (isCabinetApproverFor(req.user, applicant)) {
+      cabinetMemberId = req.user._id;
+    } else if (cabinetHead?._id) {
+      cabinetMemberId = cabinetHead._id;
+    } else if (applicant.cabinetApprovedBy) {
+      cabinetMemberId = applicant.cabinetApprovedBy;
+    }
+
     applicant.membershipStatus = "approved";
     applicant.membershipApprovedBy = req.user._id;
     applicant.membershipApprovedAt = new Date();
-    applicant.cabinetMember = cabinetHead?._id || applicant.cabinetApprovedBy || null;
+    applicant.cabinetMember = cabinetMemberId;
     applicant.teamDirector = null;
     await applicant.save();
     await Chapter.findByIdAndUpdate(chapterId, { $inc: { memberCount: 1 } });
@@ -651,11 +788,13 @@ export async function updateUser(req, res, next) {
       return res.status(403).json({ success: false, message: "Access denied." });
     }
 
-    if (isSelf && !isLeader) {
+    // Anyone may update their own profile (name / email / phone) on any dashboard
+    if (isSelf) {
       if (
         req.body.chapterRole !== undefined ||
         req.body.teamDirector !== undefined ||
-        req.body.cabinetMember !== undefined
+        req.body.cabinetMember !== undefined ||
+        req.body.systemRole !== undefined
       ) {
         return res.status(403).json({
           success: false,
@@ -663,8 +802,22 @@ export async function updateUser(req, res, next) {
         });
       }
       const profileUpdates = {};
-      for (const key of ["name", "phone", "avatar"]) {
+      for (const key of ["name", "phone", "avatar", "email"]) {
         if (req.body[key] !== undefined) profileUpdates[key] = req.body[key];
+      }
+      if (profileUpdates.email !== undefined) {
+        const nextEmail = String(profileUpdates.email).toLowerCase().trim();
+        if (!nextEmail) {
+          return res.status(400).json({ success: false, message: "Email is required." });
+        }
+        const taken = await User.findOne({ email: nextEmail, _id: { $ne: targetId } });
+        if (taken) {
+          return res.status(409).json({
+            success: false,
+            message: "That email is already in use.",
+          });
+        }
+        profileUpdates.email = nextEmail;
       }
       const user = await User.findByIdAndUpdate(targetId, profileUpdates, {
         new: true,
@@ -689,6 +842,7 @@ export async function updateUser(req, res, next) {
     const allowed = isLeader
       ? [
           "name",
+          "email",
           "phone",
           "avatar",
           "chapterRole",
@@ -699,11 +853,26 @@ export async function updateUser(req, res, next) {
           "isActive",
         ]
       : asAssigner
-        ? ["name", "phone", "avatar", "chapterRole", "isActive"]
+        ? ["name", "email", "phone", "avatar", "chapterRole", "isActive"]
         : ["teamDirector"];
 
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    if (updates.email !== undefined) {
+      const nextEmail = String(updates.email).toLowerCase().trim();
+      if (!nextEmail) {
+        return res.status(400).json({ success: false, message: "Email is required." });
+      }
+      const taken = await User.findOne({ email: nextEmail, _id: { $ne: targetId } });
+      if (taken) {
+        return res.status(409).json({
+          success: false,
+          message: "That email is already in use.",
+        });
+      }
+      updates.email = nextEmail;
     }
 
     if (updates.teamDirector === "" || updates.teamDirector === "none") {
@@ -713,7 +882,7 @@ export async function updateUser(req, res, next) {
       updates.cabinetMember = null;
     }
 
-    // Cabinet: assign members in their cabinet to one of their directors
+    // Cabinet: claim unassigned team members + assign them to a director
     if (!isLeader && asCabinet && !asAssigner) {
       if (updates.chapterRole !== undefined || updates.cabinetMember !== undefined) {
         return res.status(403).json({
@@ -722,14 +891,15 @@ export async function updateUser(req, res, next) {
         });
       }
       if (updates.teamDirector !== undefined) {
-        const inCabinet =
-          String(refId(target.cabinetMember)) === String(req.user._id) &&
-          (target.chapterRole === "member" || target.chapterRole === "assistant_director");
-        if (!inCabinet) {
+        if (!canCabinetManageMember(req.user, target)) {
           return res.status(403).json({
             success: false,
             message: "You can only assign members who belong to your cabinet.",
           });
+        }
+        // Claim / re-link team-related general members to this cabinet head
+        if (String(refId(target.cabinetMember) || "") !== String(req.user._id)) {
+          updates.cabinetMember = req.user._id;
         }
         if (updates.teamDirector) {
           const director = await User.findById(updates.teamDirector);
@@ -836,6 +1006,13 @@ export async function updateUser(req, res, next) {
       .populate("cabinetMember", "name email chapterRole")
       .populate("teamDirector", "name email chapterRole");
     if (!user) return res.status(404).json({ success: false, message: "User not found." });
+
+    // When someone becomes a cabinet head, attach approved orphans who requested that team
+    if (updates.chapterRole && isCabinetRole(updates.chapterRole)) {
+      const chapterForClaim = chapterIdOf(user) || cid;
+      await claimOrphanedMembersForCabinet(chapterForClaim, updates.chapterRole, user._id);
+    }
+
     res.json({ success: true, data: user });
   } catch (err) {
     next(err);
@@ -887,19 +1064,13 @@ export async function deleteUser(req, res, next) {
       }
     }
 
-    // Full-access: may delete chapter members and BOG; leadership seats stay protected
-    if (actorIsLeader && isFullAccessRole(targetRole)) {
-      const founderMayDelete = ["ceo", "cto", "coo"];
-      const allowed = actorRole === "founder" && founderMayDelete.includes(targetRole);
-      if (!allowed) {
-        return res.status(403).json({
-          success: false,
-          message:
-            actorRole === "founder"
-              ? "Founder can delete CEO, CTO, and COO only — not other Founder accounts."
-              : "Cannot delete a full-access leadership account (CEO / Founder / CTO / COO).",
-        });
-      }
+    // Full-access leaders may delete chapter members and any BOG seat.
+    // Only Founder may delete another full-access seat (CEO / CTO / COO / Founder).
+    if (actorIsLeader && isFullAccessRole(targetRole) && actorRole !== "founder") {
+      return res.status(403).json({
+        success: false,
+        message: "Cannot delete a full-access leadership account (CEO / Founder / CTO / COO).",
+      });
     }
 
     const targetChapterId = chapterIdOf(target);
