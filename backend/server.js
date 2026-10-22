@@ -37,6 +37,8 @@ import websiteEventRoutes from "./routes/websiteEvent.routes.js";
 import newsletterRoutes from "./routes/newsletter.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import caseReferralRoutes from "./routes/caseReferral.routes.js";
+import itRoutes from "./routes/it.routes.js";
+import itSupportRoutes from "./routes/itSupport.routes.js";
 import { startDonationReminderScheduler } from "./jobs/donationReminders.js";
 
 
@@ -139,6 +141,8 @@ app.use(`${API}/website-events`, websiteEventRoutes);
 app.use(`${API}/newsletter`, newsletterRoutes);
 app.use(`${API}/dashboard`, dashboardRoutes);
 app.use(`${API}/case-referrals`, caseReferralRoutes);
+app.use(`${API}/it`, itRoutes);
+app.use(`${API}/it-support`, itSupportRoutes);
 
 
 // 404 + error handler

@@ -34,6 +34,7 @@ import MyDonationPage from "./routes/chapter/my-donation";
 import TeamCollectionPage from "./routes/chapter/team-collection";
 import DirectorDonationsPage from "./routes/chapter/director-donations";
 import ChapterEventsPage from "./routes/chapter/events";
+import ChapterContactItPage from "./routes/chapter/contact-it";
 import { useAuth } from "./lib/auth";
 import { isPlainMember, resolveChapterRole } from "./lib/chapterRoles";
 function ChapterHomeGate() {
@@ -188,6 +189,14 @@ export default function App() {
           element={
             <ChapterModule module="notifications">
               <ChapterNotificationsPage />
+            </ChapterModule>
+          }
+        />
+        <Route
+          path="contact-it"
+          element={
+            <ChapterModule module="contact-it">
+              <ChapterContactItPage />
             </ChapterModule>
           }
         />

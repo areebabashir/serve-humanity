@@ -28,6 +28,7 @@ const CEO_BOARD_ROLES = new Set([
   "bog_media",
   "bog_finance",
   "bog_documentation",
+  "bog_it",
 ]);
 
 export function Navbar() {

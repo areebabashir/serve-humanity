@@ -10,6 +10,7 @@ export type SystemRole =
   | "bog_media"
   | "bog_finance"
   | "bog_documentation"
+  | "bog_it"
   | "president"
   | "member"
   | "public";

@@ -64,7 +64,7 @@ export const TEAM_HEAD_ROLES = CABINET_ROLES;
 
 export const VP_ROLES: ChapterRole[] = ["vice_president", "vice_president_male"];
 
-/** Roles president / VP can create (VP + cabinet seats). */
+/** Roles president / VP can create (VP + cabinet seats). IT is org-wide on CEO dashboard. */
 export const CABINET_ASSIGNABLE_ROLES: ChapterRole[] = [...VP_ROLES, ...CABINET_ROLES];
 
 /** @deprecated use CABINET_ASSIGNABLE_ROLES */
@@ -140,17 +140,27 @@ const LEADERSHIP_MODULES = [
   "case-registrations",
   "reports",
   "notifications",
+  "contact-it",
   "profile",
 ] as const;
 
-const CABINET_BASE = ["overview", "team", "team-collection", "notifications", "profile"] as const;
+const CABINET_BASE = [
+  "overview",
+  "team",
+  "team-collection",
+  "notifications",
+  "contact-it",
+  "profile",
+] as const;
+
+const MEMBER_BASE = ["my-donation", "notifications", "contact-it", "profile"] as const;
 
 /** Modules a role can open (read). Directors + cabinet heads get team-collection. */
 export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
   president: [...LEADERSHIP_MODULES],
   vice_president: [...LEADERSHIP_MODULES],
   vice_president_male: [...LEADERSHIP_MODULES],
-  director: ["overview", "team-collection", "notifications", "profile"],
+  director: ["overview", "team-collection", "notifications", "contact-it", "profile"],
   finance_head: [
     ...CABINET_BASE,
     "finance",
@@ -160,12 +170,12 @@ export const CHAPTER_MODULES: Record<ChapterRole, string[]> = {
   verification_head: [...CABINET_BASE, "ops", "verification", "director-donations", "case-registrations"],
   documentation_head: [...CABINET_BASE, "documentation", "director-donations", "case-registrations"],
   media_head: [...CABINET_BASE, "media", "director-donations"],
-  it_head: ["my-donation", "notifications", "profile"],
-  hr_head: ["my-donation", "notifications", "profile"],
-  fundraising_head: ["my-donation", "notifications", "profile"],
-  event_head: ["my-donation", "notifications", "profile"],
-  assistant_director: ["my-donation", "notifications", "profile"],
-  member: ["my-donation", "notifications", "profile"],
+  it_head: [...MEMBER_BASE],
+  hr_head: [...MEMBER_BASE],
+  fundraising_head: [...MEMBER_BASE],
+  event_head: [...MEMBER_BASE],
+  assistant_director: [...MEMBER_BASE],
+  member: [...MEMBER_BASE],
 };
 
 /** Modules a role can write. */
@@ -173,18 +183,18 @@ export const CHAPTER_WRITE: Record<ChapterRole, string[]> = {
   president: [...LEADERSHIP_MODULES],
   vice_president: [...LEADERSHIP_MODULES],
   vice_president_male: [...LEADERSHIP_MODULES],
-  director: ["team-collection"],
-  finance_head: ["team", "team-collection", "finance", "director-donations"],
-  operations_head: ["team", "team-collection", "operations", "ops", "director-donations"],
-  verification_head: ["team", "team-collection", "verification", "ops", "case-registrations", "director-donations"],
-  documentation_head: ["team", "team-collection", "documentation", "case-registrations", "director-donations"],
-  media_head: ["team", "team-collection", "media", "director-donations"],
-  it_head: ["my-donation"],
-  hr_head: ["my-donation"],
-  fundraising_head: ["my-donation"],
-  event_head: ["my-donation"],
-  assistant_director: ["my-donation"],
-  member: ["my-donation"],
+  director: ["team-collection", "contact-it"],
+  finance_head: ["team", "team-collection", "finance", "director-donations", "contact-it"],
+  operations_head: ["team", "team-collection", "operations", "ops", "director-donations", "contact-it"],
+  verification_head: ["team", "team-collection", "verification", "ops", "case-registrations", "director-donations", "contact-it"],
+  documentation_head: ["team", "team-collection", "documentation", "case-registrations", "director-donations", "contact-it"],
+  media_head: ["team", "team-collection", "media", "director-donations", "contact-it"],
+  it_head: ["my-donation", "contact-it"],
+  hr_head: ["my-donation", "contact-it"],
+  fundraising_head: ["my-donation", "contact-it"],
+  event_head: ["my-donation", "contact-it"],
+  assistant_director: ["my-donation", "contact-it"],
+  member: ["my-donation", "contact-it"],
 };
 
 export function resolveChapterRole(user: {
@@ -329,8 +339,7 @@ export function isPlainMember(role: ChapterRole): boolean {
     role === "assistant_director" ||
     role === "hr_head" ||
     role === "fundraising_head" ||
-    role === "event_head" ||
-    role === "it_head"
+    role === "event_head"
   );
 }
 

@@ -20,6 +20,7 @@ import {
   FileSpreadsheet,
   Bell,
   CalendarDays,
+  Headset,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import {
@@ -64,6 +65,7 @@ const NAV: NavItem[] = [
   { title: "Events", to: "/chapter/events", icon: CalendarDays, module: "events" },
   { title: "Members", to: "/chapter/members", icon: Users2, module: "members" },
   { title: "Notifications", to: "/chapter/notifications", icon: Bell, module: "notifications" },
+  { title: "Contact IT", to: "/chapter/contact-it", icon: Headset, module: "contact-it" },
   { title: "Finance", to: "/chapter/finance", icon: Wallet, module: "finance" },
   { title: "Documentation", to: "/chapter/documentation", icon: FolderKanban, module: "documentation" },
   {

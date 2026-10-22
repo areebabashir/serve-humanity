@@ -13,7 +13,8 @@ export type OrgRole =
   | "bog_operations"
   | "bog_media"
   | "bog_finance"
-  | "bog_documentation";
+  | "bog_documentation"
+  | "bog_it";
 
 export const ORG_ROLE_LABEL: Record<OrgRole, string> = {
   ceo: "Chief Executive",
@@ -25,6 +26,7 @@ export const ORG_ROLE_LABEL: Record<OrgRole, string> = {
   bog_media: "BOG — Media & Website",
   bog_finance: "BOG — Finance",
   bog_documentation: "BOG — Documentation",
+  bog_it: "IT Manager",
 };
 
 /** Complete access to every module and admin action */
@@ -40,6 +42,7 @@ export const CEO_DASHBOARD_ROLES: OrgRole[] = [
   "bog_media",
   "bog_finance",
   "bog_documentation",
+  "bog_it",
 ];
 
 export function isCeoDashboardRole(role: string | undefined | null): role is OrgRole {
@@ -56,14 +59,26 @@ export const ROLE_MODULES: Record<OrgRole, string[]> = {
   founder: ["*"],
   cto: ["*"],
   coo: ["*"],
-  bog_verification: ["overview", "ops", "board", "donate", "notifications"],
-  bog_operations: ["overview", "ops", "board", "donate", "notifications"],
-  bog_media: ["overview", "media", "website", "board", "donate", "notifications"],
-  bog_finance: ["overview", "finance", "board", "donate", "notifications"],
-  bog_documentation: ["overview", "documentation", "board", "donate", "notifications"],
+  bog_verification: ["overview", "ops", "board", "donate", "notifications", "contact-it"],
+  bog_operations: ["overview", "ops", "board", "donate", "notifications", "contact-it"],
+  bog_media: ["overview", "media", "website", "board", "donate", "notifications", "contact-it"],
+  bog_finance: ["overview", "finance", "board", "donate", "notifications", "contact-it"],
+  bog_documentation: ["overview", "documentation", "board", "donate", "notifications", "contact-it"],
+  bog_it: [
+    "overview",
+    "it",
+    "it-messages",
+    "board",
+    "notifications",
+    "settings",
+  ],
 };
 
 export function canAccessModule(role: OrgRole, module: string): boolean {
+  // Account administration and support inboxes belong only to the dedicated IT Manager.
+  if (module === "it" || module === "it-messages") {
+    return role === "bog_it";
+  }
   const mods = ROLE_MODULES[role] ?? [];
   return mods.includes("*") || mods.includes(module);
 }
@@ -79,6 +94,7 @@ export const ROLE_HOME: Record<OrgRole, string> = {
   bog_media: "/website",
   bog_finance: "/finance",
   bog_documentation: "/documentation",
+  bog_it: "/it",
 };
 
 export function moduleFromPath(pathname: string): string {
@@ -87,6 +103,14 @@ export function moduleFromPath(pathname: string): string {
   if (pathname.startsWith("/verification") || pathname.startsWith("/operations")) return "ops";
   if (pathname.startsWith("/reviews") || pathname.startsWith("/contact-messages") || pathname.startsWith("/website-events") || pathname.startsWith("/newsletter")) return "website";
   if (pathname.startsWith("/donate")) return "donate";
+  if (pathname.startsWith("/contact-it")) return "contact-it";
+  if (
+    pathname.startsWith("/it-board-messages") ||
+    pathname.startsWith("/it-chapter-messages")
+  ) {
+    return "it-messages";
+  }
+  if (pathname.startsWith("/it")) return "it";
   const seg = pathname.split("/").filter(Boolean)[0] ?? "";
   return seg || "overview";
 }

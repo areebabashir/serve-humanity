@@ -106,3 +106,9 @@ After `npm run seed`:
 | Chapter President | ayesha@sh.org | Password123! |
 | Finance Head | fatima@sh.org | Password123! |
 | Verification Head | sana@sh.org | Password123! |
+
+After `npm run seed:it`:
+
+| Role | Email | Password |
+|---|---|---|
+| IT Manager — CEO dashboard (`bog_it`), manages board + all chapters | it@servehumanity.org | Password123! |

@@ -8,6 +8,7 @@
     "start": "node server.js",
     "seed": "node seed.js",
     "seed:ceo": "node seed-ceo.js",
+    "seed:it": "node seed-it.js",
     "drive:auth": "node scripts/google-drive-auth.js"
   },
   "keywords": [],

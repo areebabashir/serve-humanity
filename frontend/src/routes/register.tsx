@@ -16,11 +16,15 @@ function redirectForRole(user: AuthUser, token?: string | null, navigate?: (path
   const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
   const ceoBoardRoles = [
     "ceo",
+    "founder",
+    "cto",
+    "coo",
     "bog_verification",
     "bog_operations",
     "bog_media",
     "bog_finance",
     "bog_documentation",
+    "bog_it",
   ];
   if (ceoBoardRoles.includes(user.systemRole)) {
     window.location.href = `${CEO_DASHBOARD_URL}${tokenQuery}`;

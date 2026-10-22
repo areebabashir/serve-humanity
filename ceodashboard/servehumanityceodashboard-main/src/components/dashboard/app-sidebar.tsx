@@ -34,6 +34,9 @@ import {
   Calendar,
   Mail,
   AlertTriangle,
+  MonitorCog,
+  Headset,
+  UsersRound,
 } from "lucide-react";
 
 import {
@@ -94,6 +97,20 @@ const items = [
   { title: "Documentation", url: "/documentation", module: "documentation", icon: FileText, hasSub: true },
   { title: "Finance", url: "/finance", module: "finance", icon: Wallet, hasFinanceSub: true },
   { title: "Board & Governance", url: "/board", module: "board", icon: Landmark },
+  { title: "IT Management", url: "/it", module: "it", icon: MonitorCog },
+  {
+    title: "IT — Board messages",
+    url: "/it-board-messages",
+    module: "it-messages",
+    icon: MessagesSquare,
+  },
+  {
+    title: "IT — Chapter messages",
+    url: "/it-chapter-messages",
+    module: "it-messages",
+    icon: UsersRound,
+  },
+  { title: "Contact IT", url: "/contact-it", module: "contact-it", icon: Headset },
   { title: "Reports & Analytics", url: "/reports", module: "reports", icon: BarChart3 },
   { title: "Notifications", url: "/notifications", module: "notifications", icon: Bell },
   { title: "Warning Mail", url: "/warning-mail", module: "warning-mail", icon: AlertTriangle, fullAccessOnly: true },

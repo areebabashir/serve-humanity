@@ -16,10 +16,14 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as DashboardIndexRouteImport } from './routes/_dashboard.index'
 import { Route as DashboardBoardRouteImport } from './routes/_dashboard.board'
 import { Route as DashboardChaptersRouteImport } from './routes/_dashboard.chapters'
+import { Route as DashboardContactItRouteImport } from './routes/_dashboard.contact-it'
 import { Route as DashboardContactMessagesRouteImport } from './routes/_dashboard.contact-messages'
 import { Route as DashboardDocumentationRouteImport } from './routes/_dashboard.documentation'
 import { Route as DashboardDonateRouteImport } from './routes/_dashboard.donate'
 import { Route as DashboardFinanceRouteImport } from './routes/_dashboard.finance'
+import { Route as DashboardItRouteImport } from './routes/_dashboard.it'
+import { Route as DashboardItBoardMessagesRouteImport } from './routes/_dashboard.it-board-messages'
+import { Route as DashboardItChapterMessagesRouteImport } from './routes/_dashboard.it-chapter-messages'
 import { Route as DashboardMediaRouteImport } from './routes/_dashboard.media'
 import { Route as DashboardNewsletterRouteImport } from './routes/_dashboard.newsletter'
 import { Route as DashboardNotificationsRouteImport } from './routes/_dashboard.notifications'
@@ -86,6 +90,11 @@ const DashboardChaptersRoute = DashboardChaptersRouteImport.update({
   path: '/chapters',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardContactItRoute = DashboardContactItRouteImport.update({
+  id: '/contact-it',
+  path: '/contact-it',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardContactMessagesRoute =
   DashboardContactMessagesRouteImport.update({
     id: '/contact-messages',
@@ -107,6 +116,23 @@ const DashboardFinanceRoute = DashboardFinanceRouteImport.update({
   path: '/finance',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardItRoute = DashboardItRouteImport.update({
+  id: '/it',
+  path: '/it',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardItBoardMessagesRoute =
+  DashboardItBoardMessagesRouteImport.update({
+    id: '/it-board-messages',
+    path: '/it-board-messages',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+const DashboardItChapterMessagesRoute =
+  DashboardItChapterMessagesRouteImport.update({
+    id: '/it-chapter-messages',
+    path: '/it-chapter-messages',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardMediaRoute = DashboardMediaRouteImport.update({
   id: '/media',
   path: '/media',
@@ -285,10 +311,14 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/board': typeof DashboardBoardRoute
   '/chapters': typeof DashboardChaptersRoute
+  '/contact-it': typeof DashboardContactItRoute
   '/contact-messages': typeof DashboardContactMessagesRoute
   '/documentation': typeof DashboardDocumentationRouteWithChildren
   '/donate': typeof DashboardDonateRoute
   '/finance': typeof DashboardFinanceRouteWithChildren
+  '/it': typeof DashboardItRoute
+  '/it-board-messages': typeof DashboardItBoardMessagesRoute
+  '/it-chapter-messages': typeof DashboardItChapterMessagesRoute
   '/media': typeof DashboardMediaRouteWithChildren
   '/newsletter': typeof DashboardNewsletterRoute
   '/notifications': typeof DashboardNotificationsRoute
@@ -327,8 +357,12 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/board': typeof DashboardBoardRoute
   '/chapters': typeof DashboardChaptersRoute
+  '/contact-it': typeof DashboardContactItRoute
   '/contact-messages': typeof DashboardContactMessagesRoute
   '/donate': typeof DashboardDonateRoute
+  '/it': typeof DashboardItRoute
+  '/it-board-messages': typeof DashboardItBoardMessagesRoute
+  '/it-chapter-messages': typeof DashboardItChapterMessagesRoute
   '/newsletter': typeof DashboardNewsletterRoute
   '/notifications': typeof DashboardNotificationsRoute
   '/operations': typeof DashboardOperationsRoute
@@ -369,10 +403,14 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_dashboard/board': typeof DashboardBoardRoute
   '/_dashboard/chapters': typeof DashboardChaptersRoute
+  '/_dashboard/contact-it': typeof DashboardContactItRoute
   '/_dashboard/contact-messages': typeof DashboardContactMessagesRoute
   '/_dashboard/documentation': typeof DashboardDocumentationRouteWithChildren
   '/_dashboard/donate': typeof DashboardDonateRoute
   '/_dashboard/finance': typeof DashboardFinanceRouteWithChildren
+  '/_dashboard/it': typeof DashboardItRoute
+  '/_dashboard/it-board-messages': typeof DashboardItBoardMessagesRoute
+  '/_dashboard/it-chapter-messages': typeof DashboardItChapterMessagesRoute
   '/_dashboard/media': typeof DashboardMediaRouteWithChildren
   '/_dashboard/newsletter': typeof DashboardNewsletterRoute
   '/_dashboard/notifications': typeof DashboardNotificationsRoute
@@ -415,10 +453,14 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/board'
     | '/chapters'
+    | '/contact-it'
     | '/contact-messages'
     | '/documentation'
     | '/donate'
     | '/finance'
+    | '/it'
+    | '/it-board-messages'
+    | '/it-chapter-messages'
     | '/media'
     | '/newsletter'
     | '/notifications'
@@ -457,8 +499,12 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/board'
     | '/chapters'
+    | '/contact-it'
     | '/contact-messages'
     | '/donate'
+    | '/it'
+    | '/it-board-messages'
+    | '/it-chapter-messages'
     | '/newsletter'
     | '/notifications'
     | '/operations'
@@ -498,10 +544,14 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/_dashboard/board'
     | '/_dashboard/chapters'
+    | '/_dashboard/contact-it'
     | '/_dashboard/contact-messages'
     | '/_dashboard/documentation'
     | '/_dashboard/donate'
     | '/_dashboard/finance'
+    | '/_dashboard/it'
+    | '/_dashboard/it-board-messages'
+    | '/_dashboard/it-chapter-messages'
     | '/_dashboard/media'
     | '/_dashboard/newsletter'
     | '/_dashboard/notifications'
@@ -594,6 +644,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardChaptersRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/contact-it': {
+      id: '/_dashboard/contact-it'
+      path: '/contact-it'
+      fullPath: '/contact-it'
+      preLoaderRoute: typeof DashboardContactItRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/contact-messages': {
       id: '/_dashboard/contact-messages'
       path: '/contact-messages'
@@ -620,6 +677,27 @@ declare module '@tanstack/react-router' {
       path: '/finance'
       fullPath: '/finance'
       preLoaderRoute: typeof DashboardFinanceRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/it': {
+      id: '/_dashboard/it'
+      path: '/it'
+      fullPath: '/it'
+      preLoaderRoute: typeof DashboardItRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/it-board-messages': {
+      id: '/_dashboard/it-board-messages'
+      path: '/it-board-messages'
+      fullPath: '/it-board-messages'
+      preLoaderRoute: typeof DashboardItBoardMessagesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/it-chapter-messages': {
+      id: '/_dashboard/it-chapter-messages'
+      path: '/it-chapter-messages'
+      fullPath: '/it-chapter-messages'
+      preLoaderRoute: typeof DashboardItChapterMessagesRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/media': {
@@ -918,10 +996,14 @@ const DashboardMediaRouteWithChildren = DashboardMediaRoute._addFileChildren(
 interface DashboardRouteChildren {
   DashboardBoardRoute: typeof DashboardBoardRoute
   DashboardChaptersRoute: typeof DashboardChaptersRoute
+  DashboardContactItRoute: typeof DashboardContactItRoute
   DashboardContactMessagesRoute: typeof DashboardContactMessagesRoute
   DashboardDocumentationRoute: typeof DashboardDocumentationRouteWithChildren
   DashboardDonateRoute: typeof DashboardDonateRoute
   DashboardFinanceRoute: typeof DashboardFinanceRouteWithChildren
+  DashboardItRoute: typeof DashboardItRoute
+  DashboardItBoardMessagesRoute: typeof DashboardItBoardMessagesRoute
+  DashboardItChapterMessagesRoute: typeof DashboardItChapterMessagesRoute
   DashboardMediaRoute: typeof DashboardMediaRouteWithChildren
   DashboardNewsletterRoute: typeof DashboardNewsletterRoute
   DashboardNotificationsRoute: typeof DashboardNotificationsRoute
@@ -940,10 +1022,14 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardBoardRoute: DashboardBoardRoute,
   DashboardChaptersRoute: DashboardChaptersRoute,
+  DashboardContactItRoute: DashboardContactItRoute,
   DashboardContactMessagesRoute: DashboardContactMessagesRoute,
   DashboardDocumentationRoute: DashboardDocumentationRouteWithChildren,
   DashboardDonateRoute: DashboardDonateRoute,
   DashboardFinanceRoute: DashboardFinanceRouteWithChildren,
+  DashboardItRoute: DashboardItRoute,
+  DashboardItBoardMessagesRoute: DashboardItBoardMessagesRoute,
+  DashboardItChapterMessagesRoute: DashboardItChapterMessagesRoute,
   DashboardMediaRoute: DashboardMediaRouteWithChildren,
   DashboardNewsletterRoute: DashboardNewsletterRoute,
   DashboardNotificationsRoute: DashboardNotificationsRoute,

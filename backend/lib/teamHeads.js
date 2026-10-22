@@ -46,5 +46,5 @@ export function isOwnCollectionRole(role) {
   return role === "president" || isVicePresidentRole(role);
 }
 
-/** Roles president / VP may create / assign as seats */
+/** Roles president / VP may create / assign as seats (includes chapter IT Manager) */
 export const CABINET_ASSIGNABLE_ROLES = [...VP_ROLES, ...CABINET_ROLES];
