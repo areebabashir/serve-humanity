@@ -112,3 +112,4 @@ After `npm run seed:it`:
 | Role | Email | Password |
 |---|---|---|
 | IT Manager — CEO dashboard (`bog_it`), manages board + all chapters | it@servehumanity.org | Password123! |
+"# servebcknd" 
